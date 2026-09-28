@@ -51,6 +51,13 @@
     .rail li a { display: grid; grid-template-columns: 1.6rem 1fr; gap: .42rem; padding: .5rem .3rem; color: #d3d3cc; text-decoration: none; font-size: .76rem; line-height: 1.25; border-left: 2px solid transparent; }
     .rail li a:hover, .rail li a:focus { color: #fff; background: #242421; border-left-color: var(--signal); outline: none; }
     .rail li span { color: var(--signal); font: .61rem/1.55 var(--mono); }
+    .rail nav.page-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    .rail nav.guide-nav { flex: 0 0 auto; margin-top: .75rem; padding-top: .65rem; border-top: 1px solid #4a4a45; }
+    .guide-nav-title { margin: 0 0 .25rem .3rem; color: var(--signal); font: 500 .61rem/1.25 var(--mono); letter-spacing: .09em; text-transform: uppercase; }
+    .guide-nav ol { display: grid; gap: 0; }
+    .guide-nav li + li { margin-top: 0; }
+    .guide-nav li a { grid-template-columns: 1.25rem 1fr; gap: .42rem; padding: .32rem .3rem; font-size: .72rem; }
+    .guide-nav li a[aria-current="page"] { color: #fff; background: #242421; border-left-color: var(--signal); font-weight: 600; }
     .rail-note { margin: 1.2rem .3rem; color: #9d9d95; font-size: .72rem; line-height: 1.45; }
     .tidy { display: flex; gap: .52rem; align-items: center; margin-top: auto; padding: .9rem .25rem 0; color: #a8a8a0; border-top: 1px solid #4a4a45; font-size: .65rem; line-height: 1.25; text-decoration: none; }
     .tidy img { width: 1.7rem; height: 1.7rem; object-fit: contain; filter: grayscale(1) contrast(1.1); }
@@ -211,9 +218,12 @@
     @media (max-width: 780px) {
       .shell { display: block; }
       .rail { position: relative; display: grid; grid-template-columns: 1fr auto; height: auto; padding: .85rem 1rem; }
-      .rail nav, .rail-note { display: none; }
-      .rail-top { padding: 0; border: 0; }
-      .tidy { margin: 0; padding: 0; border: 0; }
+      .rail nav.page-nav, .rail-note { display: none; }
+      .rail nav.guide-nav { display: block; grid-column: 1 / -1; grid-row: 2; margin-top: .7rem; padding-top: .55rem; }
+      .guide-nav ol { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: .5rem; }
+      .guide-nav li a { height: 100%; padding: .42rem .3rem; }
+      .rail-top { grid-column: 1; grid-row: 1; padding: 0; border: 0; }
+      .tidy { grid-column: 2; grid-row: 1; margin: 0; padding: 0; border: 0; }
       .tidy span { display: none; }
       .hero { grid-template-columns: 1fr; padding-block: 3.6rem; }
       .section { grid-template-columns: 1fr; gap: 1rem; padding-block: 3.6rem; }
@@ -364,11 +374,11 @@
   <a class="skip" href="#main">Skip to the guide</a>
   <div class="shell">
     <aside class="rail" aria-label="Guide sections">
-      <a class="rail-top" href="#main" aria-label="Back to the start of this HDBSCAN guide">
+      <a class="rail-top" href="index.html" aria-label="Return to the clustering index">
         <span class="mark" aria-hidden="true">H·ε</span>
         <span><span class="rail-kicker">Clustering</span><span class="rail-title">HDBSCAN in full</span></span>
       </a>
-      <nav aria-label="On this page">
+      <nav class="page-nav" aria-label="On this page">
         <ol>
           <li><a href="#problem"><span>01</span> One EPS is not enough</a></li>
           <li><a href="#picture"><span>02</span> The map</a></li>
@@ -385,6 +395,15 @@
           <li><a href="#check"><span>13</span> Check yourself</a></li>
           <li><a href="#sources"><span>14</span> Sources</a></li>
           <li><a href="#glossary"><span>15</span> Glossary</a></li>
+        </ol>
+      </nav>
+      <nav class="guide-nav" aria-label="Clustering guides">
+        <p class="guide-nav-title">Clustering guides</p>
+        <ol>
+          <li><a href="index.html"><span>01</span> Clustering overview</a></li>
+          <li><a href="dbscan-full-guide.html"><span>02</span> DBSCAN</a></li>
+          <li><a href="hdbscan-full-guide.html" aria-current="page"><span>03</span> HDBSCAN</a></li>
+          <li><a href="k-means-full-guide.html"><span>04</span> K-Means</a></li>
         </ol>
       </nav>
       <a class="tidy" href="https://github.com/TidyWeb/" target="_blank" rel="noopener"><img src="assets/tidyweb_logo.png" alt="TidyWeb logo"><span>© TidyWeb<br>Learning library</span></a>
