@@ -58,6 +58,16 @@
     .guide-nav li + li { margin-top: 0; }
     .guide-nav li a { grid-template-columns: 1.25rem 1fr; gap: .42rem; padding: .32rem .3rem; font-size: .72rem; }
     .guide-nav li a[aria-current="page"] { color: #fff; background: #242421; border-left-color: var(--signal); font-weight: 600; }
+    .overview-cta {
+      display: inline-block;
+      padding: .85rem 1rem;
+      color: var(--ink);
+      background: var(--signal);
+      border: 1px solid var(--ink);
+      font: 700 .78rem/1.3 var(--mono);
+      text-decoration: none;
+    }
+    .overview-cta:hover, .overview-cta:focus { outline: 2px solid var(--ink); outline-offset: 3px; }
     .rail-note { margin: 1.2rem .3rem; color: #9d9d95; font-size: .72rem; line-height: 1.45; }
     .tidy { display: flex; gap: .52rem; align-items: center; margin-top: auto; padding: .9rem .25rem 0; color: #a8a8a0; border-top: 1px solid #4a4a45; font-size: .65rem; line-height: 1.25; text-decoration: none; }
     .tidy img { width: 1.7rem; height: 1.7rem; object-fit: contain; filter: grayscale(1) contrast(1.1); }
@@ -395,6 +405,7 @@
           <li><a href="#check"><span>13</span> Check yourself</a></li>
           <li><a href="#sources"><span>14</span> Sources</a></li>
           <li><a href="#glossary"><span>15</span> Glossary</a></li>
+          <li><a href="#kmeans-next"><span>16</span> Next: K-Means</a></li>
         </ol>
       </nav>
       <nav class="guide-nav" aria-label="Clustering guides">
@@ -832,6 +843,19 @@ DBSCAN eps=1.1: 2 clusters, 4 noise</pre>
               <tr><th scope="row">Stability</th><td>A score for how long a cluster holds on to its points as EPS falls. HDBSCAN keeps the most stable clusters.</td></tr>
               <tr><th scope="row">Unsupervised learning</th><td>Learning from data that has no answer column; the method finds structure by itself.</td></tr>
             </tbody></table></div>
+          </div>
+        </section>
+
+        <section id="kmeans-next" class="section">
+          <div class="section-index"><b>16</b><span>Next: K-Means</span></div>
+          <div class="section-main">
+            <h2>When is K-Means a better fit?</h2>
+            <p class="intro">HDBSCAN looks for groups supported by dense areas and can leave isolated points as noise. K-Means asks a different question: “How should these records be divided into exactly K groups?” K is the number of groups you decide to look for.</p>
+            <p><strong>Why it can be useful:</strong> K-Means is often quick and straightforward. Each group has a centre, which can make the result easy to summarise when the groups are compact, roughly round, and similar in size.</p>
+            <p><strong>Its trade-offs:</strong> You must choose K before running it, and every record is assigned to a group—even an isolated record that might be better treated as noise. It can also struggle with curved groups or groups with very different densities. Features need sensible, comparable scales.</p>
+            <p>Use K-Means when you have a good reason to ask for a set number of groups, want every record assigned, and the groups look like they can gather around centres. Keep HDBSCAN in mind when group density varies or you want isolated points marked as noise.</p>
+            <div class="note signal"><strong>Continue with K-Means.</strong> Its full guide works through the centres, the choice of K, and how to check the groups it produces.</div>
+            <p><a class="overview-cta" href="k-means-full-guide.html">Open the full K-Means guide →</a></p>
           </div>
         </section>
       </div>

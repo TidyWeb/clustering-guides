@@ -58,6 +58,16 @@
     .guide-nav li + li { margin-top: 0; }
     .guide-nav li a { grid-template-columns: 1.25rem 1fr; gap: .42rem; padding: .32rem .3rem; font-size: .72rem; }
     .guide-nav li a[aria-current="page"] { color: #fff; background: #242421; border-left-color: var(--signal); font-weight: 600; }
+    .overview-cta {
+      display: inline-block;
+      padding: .85rem 1rem;
+      color: var(--ink);
+      background: var(--signal);
+      border: 1px solid var(--ink);
+      font: 700 .78rem/1.3 var(--mono);
+      text-decoration: none;
+    }
+    .overview-cta:hover, .overview-cta:focus { outline: 2px solid var(--ink); outline-offset: 3px; }
     .rail-note { margin: 1.2rem .3rem; color: #9d9d95; font-size: .72rem; line-height: 1.45; }
     .tidy { display: flex; gap: .52rem; align-items: center; margin-top: auto; padding: .9rem .25rem 0; color: #a8a8a0; border-top: 1px solid #4a4a45; font-size: .65rem; line-height: 1.25; text-decoration: none; }
     .tidy img { width: 1.7rem; height: 1.7rem; object-fit: contain; filter: grayscale(1) contrast(1.1); }
@@ -381,6 +391,7 @@
           <li><a href="#check"><span>13</span> Check yourself</a></li>
           <li><a href="#sources"><span>14</span> Sources</a></li>
           <li><a href="#glossary"><span>15</span> Glossary</a></li>
+          <li><a href="#hdbscan-next"><span>16</span> Next: HDBSCAN</a></li>
         </ol>
       </nav>
       <nav class="guide-nav" aria-label="Clustering guides">
@@ -858,6 +869,18 @@ one-off      4   0   0</pre>
             <h2>Words used in this guide</h2>
             <p class="intro">Every technical term used in this guide, in plain English, in alphabetical order.</p>
             <div class="table-panel glossary"><table aria-label="Glossary"><thead><tr><th>Term</th><th>What it means</th></tr></thead><tbody><tr><th scope="row">Array</th><td>A grid of numbers, like a table with no column names. scikit-learn models take their input as an array. <code>.to_numpy()</code> turns a pandas table into one.</td></tr><tr><th scope="row">Border point</th><td>A point that is not crowded itself but sits inside the circle of a core point. It joins that cluster but cannot extend it.</td></tr><tr><th scope="row">Cluster</th><td>A group of rows that the method has decided belong together.</td></tr><tr><th scope="row">Clustering</th><td>Finding groups in data when nobody has said what the groups are. It is a kind of unsupervised learning.</td></tr><tr><th scope="row">Core point</th><td>A point whose EPS circle holds at least min_samples points, counting itself. Core points build and extend clusters.</td></tr><tr><th scope="row">Crosstab</th><td>A count table: how many rows have each combination of two columns. <code>pd.crosstab</code> makes one.</td></tr><tr><th scope="row">DataFrame</th><td>pandas' name for a table: rows and named columns, like a spreadsheet inside Python.</td></tr><tr><th scope="row">DBSCAN</th><td>Density-Based Spatial Clustering of Applications with Noise: a method that groups points in crowded areas and leaves isolated points as noise.</td></tr><tr><th scope="row">Distance</th><td>How far apart two rows are. Both guides use straight-line (Euclidean) distance: square the gap in each column, add the squares, take the square root.</td></tr><tr><th scope="row">EPS (epsilon)</th><td>The radius of the circle drawn around each point. Written <code>eps</code> in code. It is measured in the same units as the data.</td></tr><tr><th scope="row">Feature</th><td>A column used as input to the method, such as spend or km east. Label columns like a customer letter are not features.</td></tr><tr><th scope="row">Fit</th><td>Run the method on your data so it can learn from it. <code>.fit(X)</code> is where the actual work happens.</td></tr><tr><th scope="row">HDBSCAN</th><td>Hierarchical DBSCAN: a related method that does not need a single EPS and copes with groups of different density.</td></tr><tr><th scope="row">k-distance chart</th><td>Each point's distance to its k-th nearest point, sorted and plotted. Here k is set equal to min_samples. A sharp upward bend suggests a value for EPS.</td></tr><tr><th scope="row">Label</th><td>The group number the method gives each row, stored in <code>labels_</code>. It is a name tag (0, 1, 2 …), not a meaning.</td></tr><tr><th scope="row">min_samples</th><td>How many points make a crowd: the smallest number of points, counting the point itself, that an EPS circle must hold for its centre point to be core.</td></tr><tr><th scope="row">Neighbourhood</th><td>Everything inside a point's EPS circle.</td></tr><tr><th scope="row">Noise</th><td>Points that are neither core nor inside a core point's circle. They get the label −1 and belong to no cluster.</td></tr><tr><th scope="row">OPTICS</th><td>A related method that orders points by density so clusters at different densities can be read off.</td></tr><tr><th scope="row">pandas / <code>pd</code></th><td>The Python library for working with tables. <code>pd</code> is the usual short name for it.</td></tr><tr><th scope="row">Parameter</th><td>A setting you choose before running a method, such as <code>n_clusters</code>, <code>eps</code> or <code>min_samples</code>.</td></tr><tr><th scope="row">Row</th><td>One record in the table: one customer, one pothole report.</td></tr><tr><th scope="row">Scaling / standardising</th><td>Putting columns on comparable scales before measuring distance, so one column does not dominate just because its numbers are bigger.</td></tr><tr><th scope="row">scikit-learn / <code>sklearn</code></th><td>The Python library that provides K-Means, DBSCAN and many other methods. It is imported under the name <code>sklearn</code>.</td></tr><tr><th scope="row">Standard deviation</th><td>A measure of how spread out a column's values are: roughly, the typical distance of a value from the column's average. Small means values are bunched together; large means they are spread out.</td></tr><tr><th scope="row">Unsupervised learning</th><td>Learning from data that has no answer column. The method has to find structure by itself.</td></tr></tbody></table></div>
+          </div>
+        </section>
+
+        <section id="hdbscan-next" class="section">
+          <div class="section-index"><b>16</b><span>Next: HDBSCAN</span></div>
+          <div class="section-main">
+            <h2>What if one EPS cannot fit every group?</h2>
+            <p class="intro">DBSCAN uses one neighbourhood size for the whole dataset. That works well when groups have a similar level of density. But if one group is packed tightly and another is spread out, the same setting can miss the spread-out group or merge areas that should stay separate.</p>
+            <p>HDBSCAN looks at how the groupings change across many neighbourhood sizes, then keeps groups that stay together over a wide range. That can help when different parts of the data have different densities, without asking you to find one EPS that suits every group.</p>
+            <p>Keep DBSCAN when its one setting describes the data clearly. Try HDBSCAN when one setting cannot do that. HDBSCAN still depends on sensible features and a minimum group-size choice; it does not decide whether a group is meaningful in the real world.</p>
+            <div class="note signal"><strong>Continue with HDBSCAN.</strong> The next guide shows how density can be checked at different scales and when that helps.</div>
+            <p><a class="overview-cta" href="hdbscan-full-guide.html">Open the full HDBSCAN guide →</a></p>
           </div>
         </section>
       </div>
