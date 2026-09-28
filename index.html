@@ -298,7 +298,7 @@
           <p class="eyebrow">Machine learning / an idea before an algorithm</p>
           <h1>Clustering</h1>
           <p class="hero-subtitle">Finding possible groups without supplied labels.</p>
-          <p class="lede">Imagine a table of people, places, or things. We know something about each row, but nobody has given us the group names. Clustering looks for rows that are alike in the features we chose. It offers a pattern to investigate—not a hidden answer it can prove is true. This overview is the shared starting point for two full method guides. Begin with <a href="dbscan-full-guide.html">DBSCAN</a> to see density-based groups without choosing K, then continue to <a href="k-means-full-guide.html">K-Means</a> to explore centre-based groups and the choice of K.</p>
+          <p class="lede">Imagine a table of people, places, or things. We know something about each row, but nobody has given us the group names. Clustering looks for rows that are alike in the features we chose. It offers a pattern to investigate—not a hidden answer it can prove is true. This overview is the shared starting point for three full method guides. Follow this order: <a href="dbscan-full-guide.html">DBSCAN</a> explores dense neighbourhoods without choosing K; <a href="hdbscan-full-guide.html">HDBSCAN</a> follows with groups of different densities; then <a href="k-means-full-guide.html">K-Means</a> explores centre-based groups and the choice of K.</p>
         </div>
         <figure class="hero-figure" aria-labelledby="hero-caption">
           <svg viewBox="0 0 560 245" role="img" aria-labelledby="hero-title hero-desc">
@@ -461,7 +461,7 @@
           <div class="section-index"><b>04</b><span>A first<br>method<br>map</span></div>
           <div class="section-main">
             <h2>Different methods look for different kinds of structure.</h2>
-            <p class="intro">“Clustering” is a family name, not one single recipe. Start by matching the shape of the question to a method’s basic behaviour. DBSCAN and K-Means each have a full companion guide. Begin with DBSCAN: it finds dense neighbourhoods without asking for K first. Then compare it with K-Means, which builds groups around a chosen number of centres.</p>
+            <p class="intro">“Clustering” is a family name, not one single recipe. Start by matching the shape of the question to a method’s basic behaviour. DBSCAN, HDBSCAN and K-Means each have a full guide. Begin with <a href="dbscan-full-guide.html">DBSCAN</a> to follow dense neighbourhoods; continue to <a href="hdbscan-full-guide.html">HDBSCAN</a> when groups have different densities; then compare both with <a href="k-means-full-guide.html">K-Means</a>, which builds groups around a chosen number of centres.</p>
             <div class="compare" aria-label="A first comparison of clustering methods">
               <article class="km">
                 <span class="tag">Choose the number of groups</span>
@@ -490,7 +490,7 @@
                   <path d="M18 55V35H48M78 55V35H48V20H90M118 55V35H145V20H90M160 55V35H145"/>
                   <circle cx="18" cy="57" r="3"/><circle cx="78" cy="57" r="3"/><circle cx="118" cy="57" r="3"/><circle cx="160" cy="57" r="3"/>
                 </svg>
-                <p>It builds a hierarchy of merges or splits. You can inspect groups at different levels, but must choose linkage and how to cut the hierarchy.</p>
+                <p>It builds a hierarchy of merges or splits. <a href="hdbscan-full-guide.html">HDBSCAN</a> uses a density-based hierarchy to handle groups with different densities; other hierarchical methods need a linkage choice and a cut level.</p>
               </article>
               <article>
                 <span class="tag">Model overlapping distributions</span>
@@ -502,7 +502,7 @@
                 <p>It models data as a mixture of distributions. Membership can be expressed as probabilities rather than only one hard assignment.</p>
               </article>
             </div>
-            <div class="bridge"><strong>Two companion guides:</strong> Start with <a href="dbscan-full-guide.html">the full DBSCAN guide</a> to follow groups growing from dense neighbourhoods, including points left as noise. Then continue to <a href="k-means-full-guide.html">the full K-Means guide</a> to follow its centre-and-assignment loop and see why you must choose K. Both build on this overview and explain different ideas of what a group is.</div>
+            <div class="bridge"><strong>Three guides in sequence:</strong> Start with <a href="dbscan-full-guide.html">the full DBSCAN guide</a> to follow groups growing from dense neighbourhoods; continue to <a href="hdbscan-full-guide.html">the full HDBSCAN guide</a> to see how groups with different densities are handled; then read <a href="k-means-full-guide.html">the full K-Means guide</a> to follow its centre-and-assignment loop and see why you must choose K. All three build on this overview and explain different ideas of what a group is.</div>
           </div>
         </section>
 
@@ -526,13 +526,13 @@
           <div class="section-index"><b>06</b><span>Next:<br>DBSCAN<br>in depth</span></div>
           <div class="section-main">
             <h2>Start with DBSCAN.</h2>
-            <p class="intro">The overview gave us the shared vocabulary: rows, features, similarity, and possible group shapes. The first full guide follows a small map of pothole reports to show how dense neighbourhoods connect, how isolated reports can remain noise, and how DBSCAN works without a chosen K.</p>
-            <div class="note"><strong>In the DBSCAN guide:</strong> follow the core, border, and noise roles; see how EPS and min_samples shape dense neighbourhoods; then inspect distance, scaling, limitations, and the Python result. After that, continue to <a href="k-means-full-guide.html">K-Means</a> to explore its centres and the decision about K.</div>
+            <p class="intro">The overview gave us the shared vocabulary: rows, features, similarity, and possible group shapes. The first full guide follows a small map of pothole reports to show how dense neighbourhoods connect, how isolated reports can remain noise, and how DBSCAN works without a chosen K. Next, <a href="hdbscan-full-guide.html">HDBSCAN</a> handles different densities; <a href="k-means-full-guide.html">K-Means</a> follows after that.</p>
+            <div class="note"><strong>In the DBSCAN guide:</strong> follow the core, border, and noise roles; see how EPS and min_samples shape dense neighbourhoods; then inspect distance, scaling, limitations, and the Python result. After DBSCAN, continue to <a href="hdbscan-full-guide.html">HDBSCAN</a> for groups with different densities, then <a href="k-means-full-guide.html">K-Means</a> to explore its centres and the decision about K.</div>
             <p><a class="overview-cta" href="dbscan-full-guide.html">Open the full DBSCAN guide →</a></p>
             <div class="source-grid">
               <article class="source-card">
                 <h3>What this overview builds on</h3>
-                <p>The Code Institute lesson introduces the clustering question and names several method families. This overview builds that shared starting point, followed by two full guides that explore DBSCAN and K-Means in depth.</p>
+                <p>The Code Institute lesson introduces the clustering question and names several method families. This overview builds that shared starting point, followed by three full guides, in order: DBSCAN, HDBSCAN and K-Means.</p>
               </article>
               <article class="source-card">
                 <h3>Further reading</h3>
