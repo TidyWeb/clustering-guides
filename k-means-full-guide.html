@@ -1,0 +1,1030 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A visual guide to K-Means clustering: what it does, how the loop works, how to choose K, where it fails, and how to run it in Python.">
+  <title>K-Means — finding groups nobody has labelled</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <style>
+
+    /* Self-hosted fonts (SIL Open Font License, see assets/fonts/OFL-*.txt) */
+    /* Self-hosted Liberation Sans (SIL OFL, see assets/fonts/OFL-Liberation-Sans.txt) */
+    @font-face { font-family: 'Liberation Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('assets/fonts/liberation-sans-regular.woff2') format('woff2'); }
+    @font-face { font-family: 'Liberation Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url('assets/fonts/liberation-sans-bold.woff2') format('woff2'); }
+    @font-face { font-family: 'Liberation Sans'; font-style: italic; font-weight: 400; font-display: swap; src: url('assets/fonts/liberation-sans-italic.woff2') format('woff2'); }
+    @font-face { font-family: 'Liberation Sans'; font-style: italic; font-weight: 700; font-display: swap; src: url('assets/fonts/liberation-sans-bold-italic.woff2') format('woff2'); }
+    @font-face { font-family: 'DM Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('assets/fonts/dm-mono-400.woff2') format('woff2'); }
+    @font-face { font-family: 'DM Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('assets/fonts/dm-mono-500.woff2') format('woff2'); }
+    :root {
+      --ink: #111111;
+      --paper: #f6f6f2;
+      --white: #ffffff;
+      --soft: #e9e9e3;
+      --line: #c7c7bf;
+      --quiet: #64645e;
+      --signal: #d9ff38;
+      --signal-ink: #324000;
+      --blue: #135d77;
+      --orange: #a54e2c;
+      --mono: 'DM Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+      --sans: 'Liberation Sans', Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; color: var(--ink); background: var(--paper); font: 17px/1.55 var(--sans); }
+    a { color: inherit; }
+    code { padding: .08em .28em; background: #e7e7e0; font: .88em var(--mono); }
+    .skip { position: fixed; z-index: 20; top: -4rem; left: 1rem; padding: .5rem .75rem; color: var(--ink); background: var(--signal); }
+    .skip:focus { top: 0; }
+
+    .shell { display: grid; grid-template-columns: 14.25rem minmax(0, 1fr); min-height: 100vh; }
+    .rail { position: sticky; top: 0; display: flex; flex-direction: column; height: 100vh; padding: 1.25rem 1rem 1rem; color: #f4f4ee; background: var(--ink); }
+    .rail-top { display: flex; gap: .7rem; align-items: center; padding-bottom: 1.15rem; border-bottom: 1px solid #4a4a45; text-decoration: none; }
+    .mark { display: grid; width: 2.35rem; height: 2.35rem; place-items: center; color: var(--ink); background: var(--signal); font: 700 .72rem/1 var(--mono); letter-spacing: -.08em; }
+    .rail-kicker, .rail-title { margin: 0; }
+    .rail-kicker { color: var(--signal); font: 500 .61rem/1.25 var(--mono); letter-spacing: .09em; text-transform: uppercase; }
+    .rail-title { display: block; margin-top: .22rem; font-size: .88rem; font-weight: 600; line-height: 1.15; }
+    .rail nav { margin-top: 1.5rem; }
+    .rail ol { margin: 0; padding: 0; list-style: none; }
+    .rail li + li { margin-top: .12rem; }
+    .rail li a { display: grid; grid-template-columns: 1.6rem 1fr; gap: .42rem; padding: .5rem .3rem; color: #d3d3cc; text-decoration: none; font-size: .76rem; line-height: 1.25; border-left: 2px solid transparent; }
+    .rail li a:hover, .rail li a:focus { color: #fff; background: #242421; border-left-color: var(--signal); outline: none; }
+    .rail li span { color: var(--signal); font: .61rem/1.55 var(--mono); }
+    .rail-note { margin: 1.2rem .3rem; color: #9d9d95; font-size: .72rem; line-height: 1.45; }
+    .tidy { display: flex; gap: .52rem; align-items: center; margin-top: auto; padding: .9rem .25rem 0; color: #a8a8a0; border-top: 1px solid #4a4a45; font-size: .65rem; line-height: 1.25; text-decoration: none; }
+    .tidy img { width: 1.7rem; height: 1.7rem; object-fit: contain; filter: grayscale(1) contrast(1.1); }
+
+    main { min-width: 0; overflow: hidden; background-image: linear-gradient(#0000 95%, rgb(17 17 17 / .045) 95%), linear-gradient(90deg, #0000 95%, rgb(17 17 17 / .045) 95%); background-size: 100% 2rem, 2rem 100%; }
+    .topline { display: flex; justify-content: space-between; gap: 1rem; padding: .72rem clamp(1.25rem, 5vw, 5rem); color: #e7e7e2; background: var(--ink); font: .65rem var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+    .topline span:last-child { color: var(--signal); }
+
+    .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(24rem, .86fr); gap: clamp(1.5rem, 4vw, 5rem); align-items: end; max-width: 91rem; margin: auto; padding: clamp(3rem, 7vw, 7rem) clamp(1.25rem, 5vw, 5rem) 4rem; }
+    .eyebrow { margin: 0 0 .85rem; color: var(--quiet); font: .67rem var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 47rem; margin-bottom: 1.4rem; font-size: clamp(3.35rem, 8.2vw, 7.4rem); font-weight: 600; letter-spacing: -.075em; line-height: .86; }
+    h1 .outline { color: transparent; -webkit-text-stroke: 1.6px var(--ink); }
+    .hero-subtitle { max-width: 39rem; margin: -0.45rem 0 1.55rem; color: var(--quiet); font-size: clamp(1.55rem, 3.1vw, 2.8rem); font-weight: 600; letter-spacing: -.055em; line-height: 1; }
+    .lede { max-width: 39rem; margin-bottom: 0; font-size: clamp(1.06rem, 1.6vw, 1.28rem); line-height: 1.48; }
+    .hero-figure { position: relative; padding: 1rem; color: #f6f6f2; background: var(--ink); outline: 1px solid var(--ink); outline-offset: 7px; }
+    .hero-figure::before { position: absolute; top: .55rem; left: .8rem; content: 'THE CENTRAL IDEA'; color: var(--signal); font: .6rem var(--mono); letter-spacing: .09em; }
+    .hero-figure svg { display: block; width: 100%; height: auto; margin-top: 1rem; }
+    .hero-figure figcaption { margin-top: .35rem; padding-top: .7rem; color: #adada6; border-top: 1px solid #44443f; font: .66rem/1.4 var(--mono); }
+
+    .content { max-width: 91rem; margin: auto; padding: 0 clamp(1.25rem, 5vw, 5rem) 5rem; }
+    section { scroll-margin-top: 1rem; }
+    .record { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 0 1.5rem; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+    .record div { min-height: 5.5rem; padding: 1rem; border-right: 1px solid var(--ink); }
+    .record div:last-child { border-right: 0; }
+    .record strong { display: block; margin-bottom: .35rem; color: var(--quiet); font: .6rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .record div:last-child strong { color: var(--orange); }
+
+    .note { margin: 1.4rem 0; padding: .95rem 1rem; border-left: 3px solid var(--ink); background: var(--white); }
+    .note.signal { border-left-color: var(--signal); }
+    .note strong { background: var(--signal); }
+    .contents { display: grid; grid-template-columns: 10rem 1fr; gap: 1.5rem; margin: 2rem 0 1rem; padding: 1rem 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+    .contents > strong { font: .65rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .contents ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem 1.5rem; margin: 0; padding-left: 1.2rem; }
+    .contents a { text-decoration-thickness: .08em; text-underline-offset: .17em; }
+
+    .section { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: clamp(1rem, 4vw, 4.6rem); padding: 5rem 0; border-top: 1px solid var(--ink); }
+    .section-index { padding-top: .45rem; }
+    .section-index b { display: block; font: 500 2rem/.82 var(--mono); letter-spacing: -.12em; }
+    .section-index span { display: block; margin-top: .9rem; color: var(--quiet); font: .6rem/1.3 var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+    .section-main { min-width: 0; }
+    h2 { max-width: 57rem; margin-bottom: 1rem; font-size: clamp(2.15rem, 4.5vw, 4.7rem); font-weight: 600; letter-spacing: -.06em; line-height: .94; }
+    h3 { font-size: 1.32rem; line-height: 1; letter-spacing: -.035em; }
+    .intro { max-width: 49rem; margin-bottom: 2.1rem; color: #363632; font-size: 1.08rem; }
+    .bridge { max-width: 54rem; margin: 1.2rem 0; padding: .85rem 0 .15rem 1rem; border-left: 3px solid var(--ink); font-size: .92rem; }
+    .bridge strong { background: var(--signal); }
+
+    .data-stage { display: grid; grid-template-columns: minmax(0, 1fr) 14rem; border: 1px solid var(--ink); background: var(--white); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: .75rem .9rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { background: #efefeb; font: .63rem var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .data-stage aside { display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; color: #f6f6f2; background: var(--ink); }
+    .data-stage aside p { color: #aaa; font: .69rem/1.4 var(--mono); }
+    .data-stage aside strong { color: var(--signal); font: 500 3.8rem/.8 var(--mono); }
+    .data-key { display: grid; grid-template-columns: 3fr 1fr; margin-top: .7rem; border: 1px solid var(--ink); font-size: .84rem; }
+    .data-key span { padding: .65rem .8rem; }
+    .data-key span:first-child { border-right: 1px solid var(--ink); }
+    .data-key b { font-family: var(--mono); }
+
+    figure { margin: 1.8rem 0 0; }
+    .plot { overflow: hidden; border: 1px solid var(--ink); background: var(--white); }
+    .plot svg { display: block; width: 100%; height: auto; }
+    figcaption { margin-top: .65rem; color: var(--quiet); font-size: .82rem; }
+    .plot-key { display: flex; flex-wrap: wrap; gap: .8rem 1.3rem; margin-top: .7rem; color: var(--quiet); font: .66rem var(--mono); }
+    .plot-key span::before { display: inline-block; width: .7rem; height: .7rem; margin-right: .35rem; vertical-align: -.08rem; background: var(--ink); content: ''; }
+    .plot-key .lime::before { background: var(--signal); border: 1px solid var(--ink); }
+    .plot-key .blue::before { background: var(--blue); }
+    .plot-key .orange::before { background: var(--orange); }
+
+    .workflow { display: grid; grid-template-columns: repeat(6, minmax(7rem, 1fr)); margin-top: 2rem; border: 1px solid var(--ink); background: var(--white); }
+    .flow-step { position: relative; min-height: 14.5rem; padding: 1rem; border-right: 1px solid var(--ink); }
+    .flow-step:last-child { border-right: 0; }
+    .flow-step::after { position: absolute; top: 1.12rem; right: -.55rem; z-index: 2; color: var(--ink); background: var(--signal); content: '→'; font: 1rem var(--mono); }
+    .flow-step:last-child::after { display: none; }
+    .flow-num { display: grid; width: 2.35rem; height: 2.35rem; place-items: center; border: 1px solid var(--ink); font: .65rem var(--mono); }
+    .flow-step.active { color: #f6f6f2; background: var(--ink); }
+    .flow-step.active .flow-num { color: var(--ink); background: var(--signal); border-color: var(--signal); }
+    .flow-step h3 { margin-top: 2rem; }
+    .flow-step p { margin-bottom: 0; color: var(--quiet); font-size: .82rem; line-height: 1.36; }
+    .flow-step.active p { color: #c4c4bd; }
+
+    .rounds { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.8rem; }
+    .round { border: 1px solid var(--ink); background: var(--white); }
+    .round h3 { margin: 0; padding: .8rem 1rem; border-bottom: 1px solid var(--ink); font: .75rem var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+    .round h3 span { float: right; color: var(--orange); }
+    .round svg { display: block; width: 100%; height: auto; }
+    .round p { margin: 0; padding: .8rem 1rem 1rem; color: var(--quiet); font-size: .84rem; }
+    .legend-box { display: inline-block; margin-top: .8rem; padding: .4rem .6rem; border: 1px dashed var(--ink); color: var(--quiet); font: .66rem var(--mono); }
+
+    .formula { display: grid; grid-template-columns: 1.2fr .8fr; gap: 1px; margin-top: 1.6rem; border: 1px solid var(--ink); background: var(--ink); }
+    .formula > div { padding: 1.2rem; background: var(--white); }
+    .formula > div:last-child { color: #f6f6f2; background: var(--ink); }
+    .formula b { display: block; margin-bottom: .55rem; color: var(--orange); font: .65rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .formula .equation { font: clamp(1.15rem, 2.2vw, 1.8rem) var(--mono); }
+    .formula p { margin-bottom: 0; color: var(--quiet); font-size: .88rem; }
+    .formula > div:last-child p { color: #c4c4bd; }
+
+    .diagnostics { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.8rem; }
+    .diagnostic { border: 1px solid var(--ink); background: var(--white); }
+    .diagnostic h3 { margin: 0; padding: .8rem 1rem; border-bottom: 1px solid var(--ink); }
+    .diagnostic h3 small { float: right; color: var(--quiet); font: .62rem var(--mono); }
+    .diagnostic svg { display: block; width: 100%; height: auto; }
+    .diagnostic p { margin: 0; padding: .8rem 1rem 1rem; color: var(--quiet); font-size: .84rem; }
+
+    .compare { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 1.8rem; border-top: 1px solid var(--ink); border-left: 1px solid var(--ink); }
+    .compare article { min-height: 16rem; padding: 1rem; background: var(--white); border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+    .compare article.km { color: #f6f6f2; background: var(--ink); }
+    .compare .tag { color: var(--quiet); font: .6rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .compare .km .tag { color: var(--signal); }
+    .compare h3 { margin-top: 1.7rem; }
+    .compare p { color: var(--quiet); font-size: .82rem; line-height: 1.38; }
+    .compare .km p { color: #c4c4bd; }
+    .mini-shape { display: block; width: 100%; height: 4.3rem; margin-top: .8rem; border-bottom: 1px solid currentColor; }
+    .compare .mini-shape circle, .compare .mini-shape path, .compare .mini-shape ellipse { fill: none; stroke: currentColor; stroke-width: 1.6; }
+    .compare .mini-shape circle { fill: currentColor; stroke: none; }
+
+    .pca-board { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: .6rem; align-items: center; margin-top: 1.8rem; padding: 1rem; color: #f6f6f2; background: var(--ink); }
+    .pca-stage { min-height: 10rem; padding: .7rem; border: 1px solid #5b5b55; }
+    .pca-stage h3 { margin-bottom: .35rem; color: var(--signal); font: .7rem var(--mono); text-transform: uppercase; }
+    .pca-stage p { color: #c4c4bd; font-size: .78rem; }
+    .pca-arrow { color: var(--signal); font: 1.6rem var(--mono); }
+    .pca-stage svg { display: block; width: 100%; height: auto; margin-top: .3rem; }
+
+    .profile { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--ink); background: var(--white); }
+    .profile table { min-width: 42rem; }
+    .profile th:last-child { background: var(--signal); }
+    .profile-note { margin-top: .8rem; color: var(--quiet); font-size: .86rem; }
+
+    .recall-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.6rem; }
+    details { border: 1px solid var(--ink); background: var(--white); }
+    summary { padding: .9rem 1rem; cursor: pointer; font-weight: 600; }
+    details p, details ul { margin: 0; padding: 0 1rem 1rem; color: var(--quiet); font-size: .88rem; }
+    details ul { padding-left: 2.2rem; }
+
+    .source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.4rem; }
+    .source-card { padding: 1rem; border: 1px solid var(--ink); background: var(--white); }
+    .source-card h3 { margin-bottom: .6rem; }
+    .source-card p, .source-card li { color: var(--quiet); font-size: .84rem; }
+    .source-card ul { margin-bottom: 0; padding-left: 1.25rem; }
+    .scope-table { overflow-x: auto; margin-top: 1.3rem; }
+    .scope-table table { min-width: 42rem; border: 1px solid var(--ink); background: var(--white); }
+    .scope-table th, .scope-table td { border-bottom: 1px solid var(--line); }
+
+    footer.page-footer { max-width: 91rem; margin: auto; padding: 2rem clamp(1.25rem, 5vw, 5rem) 4rem; color: var(--quiet); font-size: .75rem; }
+    footer.page-footer a { text-decoration-thickness: .08em; text-underline-offset: .17em; }
+
+    @media (max-width: 1280px) {
+      .workflow { grid-template-columns: repeat(3, 1fr); }
+      .flow-step:nth-child(3) { border-right: 0; }
+      .flow-step:nth-child(n + 4) { border-top: 1px solid var(--ink); }
+      .flow-step:nth-child(3)::after, .flow-step:nth-child(6)::after { display: none; }
+      .compare { grid-template-columns: repeat(2, 1fr); }
+      .compare article:nth-child(2) { border-right: 0; }
+      .compare article:nth-child(n + 3) { border-top: 1px solid var(--ink); }
+    }
+    @media (max-width: 780px) {
+      .shell { display: block; }
+      .rail { position: relative; display: grid; grid-template-columns: 1fr auto; height: auto; padding: .85rem 1rem; }
+      .rail nav, .rail-note { display: none; }
+      .rail-top { padding: 0; border: 0; }
+      .tidy { margin: 0; padding: 0; border: 0; }
+      .tidy span { display: none; }
+      .hero { grid-template-columns: 1fr; padding-block: 3.6rem; }
+      .section { grid-template-columns: 1fr; gap: 1rem; padding-block: 3.6rem; }
+      .section-index { display: flex; gap: .75rem; align-items: baseline; padding: 0; }
+      .section-index span { margin: 0; }
+      .record { grid-template-columns: repeat(2, 1fr); }
+      .record div:nth-child(2) { border-right: 0; }
+      .record div:nth-child(-n + 2) { border-bottom: 1px solid var(--ink); }
+      .contents { grid-template-columns: 1fr; gap: .75rem; }
+      .data-stage, .formula, .pca-board { grid-template-columns: 1fr; }
+      .data-stage aside { min-height: 8rem; }
+      .data-key { grid-template-columns: 1fr; }
+      .data-key span:first-child { border-right: 0; border-bottom: 1px solid var(--ink); }
+      .rounds, .diagnostics, .recall-grid, .source-grid { grid-template-columns: 1fr; }
+      .pca-arrow { justify-self: center; transform: rotate(90deg); }
+      .workflow { grid-template-columns: repeat(2, 1fr); }
+      .flow-step:nth-child(3) { border-right: 1px solid var(--ink); }
+      .flow-step:nth-child(2), .flow-step:nth-child(4), .flow-step:nth-child(6) { border-right: 0; }
+      .flow-step:nth-child(3), .flow-step:nth-child(4) { border-top: 1px solid var(--ink); }
+      .flow-step:nth-child(3)::after, .flow-step:nth-child(4)::after { display: none; }
+    }
+    @media (max-width: 460px) {
+      .topline span:first-child { display: none; }
+      h1 { font-size: 3.6rem; }
+      .record, .workflow, .compare { grid-template-columns: 1fr; }
+      .record div, .record div:nth-child(n) { border-right: 0; border-bottom: 1px solid var(--ink); }
+      .record div:last-child { border-bottom: 0; }
+      .flow-step, .flow-step:nth-child(n) { min-height: 0; border-right: 0; border-top: 0; border-bottom: 1px solid var(--ink); }
+      .flow-step:last-child { border-bottom: 0; }
+      .flow-step::after { display: none; }
+      .flow-step h3 { margin-top: 1.4rem; }
+      .compare article, .compare article:nth-child(n) { min-height: 0; border-right: 0; border-top: 0; border-bottom: 1px solid var(--ink); }
+      .compare article:last-child { border-bottom: 0; }
+      .contents ol { grid-template-columns: 1fr; }
+    }
+  
+    /* ---- additions for the full guide (same tokens, same grammar) ---- */
+    .rail nav { min-height: 0; overflow-y: auto; }
+    .rail li a.active { color: #fff; background: #242421; border-left-color: var(--signal); }
+    .hero-figure .plot { margin-top: 1rem; border-color: #55554f; }
+    .calc + p, .calc + .table-panel { margin-top: 1rem; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.6rem; }
+    .split > figure { margin: 0; }
+    .panel { border: 1px solid var(--ink); background: var(--white); }
+    .panel h3 { margin: 0; padding: .8rem 1rem; border-bottom: 1px solid var(--ink); }
+    .panel h3 small { float: right; color: var(--quiet); font: .62rem var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+    .panel > p, .panel > ul { margin: 0; padding: .8rem 1rem 1rem; color: var(--quiet); font-size: .88rem; }
+    .panel > ul { padding-left: 2.1rem; }
+    .panel li + li { margin-top: .35rem; }
+    .panel svg { display: block; width: 100%; height: auto; }
+    .table-panel { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--ink); background: var(--white); }
+    .table-panel td:not(:first-child), .table-panel th:not(:first-child) { font-family: var(--mono); font-size: .86rem; }
+    .calc { margin-top: 1.4rem; padding: 1rem 1.1rem; border: 1px solid var(--ink); background: var(--white); font: .9rem/1.8 var(--mono); overflow-x: auto; }
+    .calc b { color: var(--orange); font-weight: 500; }
+    .calc .result { padding: 0 .25rem; background: var(--signal); }
+    .frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem; margin-top: 1.4rem; }
+    .frame { margin: 0; }
+    .frame figcaption b { display: inline-block; min-width: 1.5rem; margin-right: .35rem; padding: 0 .3rem; color: var(--ink); background: var(--signal); font: .7rem/1.5 var(--mono); text-align: center; }
+    .stepper { margin-top: 1.8rem; border: 1px solid var(--ink); background: var(--white); }
+    .stepper-bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .8rem 1rem; color: #f6f6f2; background: var(--ink); }
+    .stepper-bar span { margin-right: .4rem; color: var(--signal); font: .62rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .stepper button { padding: .45rem .75rem; color: var(--ink); background: var(--white); border: 1px solid var(--ink); font: .74rem var(--mono); cursor: pointer; }
+    .stepper-bar button { border-color: #f6f6f2; }
+    .stepper button[aria-pressed="true"] { background: var(--signal); }
+    .stepper button:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+    .stepper-controls { display: flex; flex-wrap: wrap; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--ink); }
+    .stepper-status { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--ink); }
+    .stepper-status div { padding: .7rem 1rem; border-right: 1px solid var(--line); font: .8rem var(--mono); }
+    .stepper-status div:last-child { border-right: 0; }
+    .stepper-status strong { display: block; margin-bottom: .2rem; color: var(--quiet); font: .58rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .stepper-note { margin: 0; padding: .8rem 1rem 1rem; border-top: 1px solid var(--ink); color: var(--quiet); font-size: .88rem; }
+    .code-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(15rem, .8fr); margin-top: 1.4rem; border: 1px solid var(--ink); }
+    pre { margin: 0; padding: 1.3rem; overflow: auto; color: #f0f0ec; background: var(--ink); font: .8rem/1.67 var(--mono); }
+    pre code { padding: 0; background: none; font: inherit; }
+    .comment { color: #9c9c94; }
+    .focus { color: var(--signal); }
+    .code-notes { padding: 1.2rem; background: var(--white); }
+    .code-notes ol { margin: 1rem 0 0; padding: 0; list-style: none; counter-reset: note; }
+    .code-notes li { position: relative; padding: 0 0 1rem 2rem; color: #454540; font-size: .86rem; counter-increment: note; }
+    .code-notes li::before { position: absolute; left: 0; display: grid; width: 1.35rem; height: 1.35rem; place-items: center; background: var(--signal); content: counter(note); color: var(--ink); font: .62rem var(--mono); }
+    .code-notes li:last-child { padding-bottom: 0; }
+    .output { margin: 0; padding: .9rem 1.3rem; color: var(--ink); border: 1px solid var(--ink); border-top: 0; background: #efefeb; font: .78rem/1.6 var(--mono); white-space: pre; overflow-x: auto; }
+    .output::before { display: block; margin-bottom: .3rem; color: var(--quiet); content: 'OUTPUT'; font-size: .6rem; letter-spacing: .08em; }
+    h3.step-title { margin: 2.6rem 0 .5rem; }
+    .cite { font-size: .82em; white-space: nowrap; }
+    .source-list { margin: 0; padding-left: 1.2rem; }
+    .source-list li { margin-bottom: .45rem; color: var(--quiet); font-size: .86rem; }
+    @media (max-width: 1100px) { .code-grid { grid-template-columns: 1fr; } .code-notes { border-top: 1px solid var(--ink); } }
+    @media (max-width: 780px) {
+      .split { grid-template-columns: 1fr; }
+      .stepper-status { grid-template-columns: repeat(2, 1fr); }
+      .stepper-status div:nth-child(2) { border-right: 0; }
+      .stepper-status div:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
+    }
+    .glossary th[scope="row"] { width: 13rem; color: var(--ink); font: 700 .95rem/1.4 var(--sans); letter-spacing: 0; text-transform: none; vertical-align: top; }
+    .glossary td:not(:first-child) { font: .95rem/1.55 var(--sans); }
+    .glossary code { font-size: .85em; }
+    .stepper-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(15rem, 1fr); }
+    .stepper-explain { position: sticky; top: 9rem; align-self: start; padding: 1rem 1.1rem 1.2rem; border-left: 1px solid var(--ink); background: #fbfbf8; }
+    .ex-kicker { margin: 0; color: var(--quiet); font: .62rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .stepper-explain h4 { margin: .35rem 0 .6rem; font-size: 1.15rem; line-height: 1.25; }
+    .stepper-explain .ex-label { margin: .9rem 0 .25rem; color: var(--signal-ink); font: .62rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .stepper-explain p:not(.ex-label):not(.ex-kicker) { margin: 0; font-size: .92rem; line-height: 1.5; }
+    @media (max-width: 900px) { .stepper-body { grid-template-columns: 1fr; } .stepper-explain { order: -1; position: static; border-left: 0; border-bottom: 1px solid var(--ink); } }
+    .stepper-top { position: sticky; top: 0; z-index: 2; background: var(--white); border-bottom: 1px solid var(--ink); }
+    .stepper-top .stepper-controls { border-top: 0; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to the guide</a>
+  <div class="shell">
+    <aside class="rail" aria-label="Guide sections">
+      <a class="rail-top" href="#main" aria-label="Back to the start of this K-Means guide">
+        <span class="mark" aria-hidden="true">x→k</span>
+        <span><span class="rail-kicker">Clustering</span><span class="rail-title">K-Means in full</span></span>
+      </a>
+      <nav aria-label="On this page">
+        <ol>
+          <li><a href="#question"><span>01</span> Rows with no labels</a></li>
+          <li><a href="#picture"><span>02</span> Rows become points</a></li>
+          <li><a href="#distance"><span>03</span> Distance and scale</a></li>
+          <li><a href="#loop"><span>04</span> The loop, step by step</a></li>
+          <li><a href="#cost"><span>05</span> What it minimises</a></li>
+          <li><a href="#choose-k"><span>06</span> Choosing K</a></li>
+          <li><a href="#starts"><span>07</span> Starting positions</a></li>
+          <li><a href="#limits"><span>08</span> Where it goes wrong</a></li>
+          <li><a href="#when"><span>09</span> When to use it</a></li>
+          <li><a href="#python"><span>10</span> K-Means in Python</a></li>
+          <li><a href="#interpret"><span>11</span> Describe the groups</a></li>
+          <li><a href="#alternatives"><span>12</span> Other methods</a></li>
+          <li><a href="#check"><span>13</span> Check yourself</a></li>
+          <li><a href="#sources"><span>14</span> Sources</a></li>
+          <li><a href="#glossary"><span>15</span> Glossary</a></li>
+        </ol>
+      </nav>
+      <a class="tidy" href="https://github.com/TidyWeb/" target="_blank" rel="noopener"><img src="assets/tidyweb_logo.png" alt="TidyWeb logo"><span>© TidyWeb<br>Learning library</span></a>
+    </aside>
+
+    <main id="main">
+      <div class="topline"><span>Advanced Data Analysis Techniques</span><span>K-Means / concept to code</span></div>
+
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Unsupervised learning / clustering</p>
+          <h1>K-<span class="outline">Means</span></h1>
+          <p class="hero-subtitle">Finding groups nobody has labelled.</p>
+          <p class="lede">K-Means takes rows of numbers, a chosen number of groups K, and puts each row in the group whose centre is nearest. This guide uses one small customer table from start to finish: first as a picture, then as a calculation, then as Python code. By the end you should be able to explain what K-Means does, run it, judge whether its groups are any good, and recognise when to use something else. Start at the <a href="index.html">clustering overview</a>; compare this centre-based method with the <a href="dbscan-full-guide.html">DBSCAN full guide</a>.</p>
+        </div>
+        <figure class="hero-figure" aria-labelledby="hero-caption">
+          <div class="plot"><svg viewBox="0 0 720 460" role="img" aria-labelledby="hero-t hero-d"><title id="hero-t">Customers A to I grouped into three</title><desc id="hero-d">The nine customers drawn to scale, marked by group with a centre at the middle of each group.</desc><rect width="720" height="460" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="72.0" y1="24" x2="72.0" y2="398"/><line x1="228.0" y1="24" x2="228.0" y2="398"/><line x1="384.0" y1="24" x2="384.0" y2="398"/><line x1="540.0" y1="24" x2="540.0" y2="398"/><line x1="696.0" y1="24" x2="696.0" y2="398"/><line x1="72" y1="398.0" x2="696" y2="398.0"/><line x1="72" y1="303.8" x2="696" y2="303.8"/><line x1="72" y1="209.7" x2="696" y2="209.7"/><line x1="72" y1="115.5" x2="696" y2="115.5"/></g><line x1="72" y1="398" x2="696" y2="398" stroke="#111111" stroke-width="1.5"/><line x1="72" y1="398" x2="72" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="72.0" y="416" text-anchor="middle">£0</text><text x="228.0" y="416" text-anchor="middle">£300</text><text x="384.0" y="416" text-anchor="middle">£600</text><text x="540.0" y="416" text-anchor="middle">£900</text><text x="696.0" y="416" text-anchor="middle">£1,200</text><text x="64" y="402.0" text-anchor="end">0</text><text x="64" y="307.8" text-anchor="end">20</text><text x="64" y="213.7" text-anchor="end">40</text><text x="64" y="119.5" text-anchor="end">60</text><text x="384.0" y="446" text-anchor="middle">annual spend (£)</text><text x="16" y="211.0" transform="rotate(-90 16 211.0)" text-anchor="middle">visits per year</text></g><circle cx="124.0" cy="350.9" r="7" fill="#111111"/><text x="134.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">A</text><circle cx="150.0" cy="341.5" r="7" fill="#111111"/><text x="160.0" y="333.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">B</text><circle cx="176.0" cy="360.3" r="7" fill="#111111"/><text x="186.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">C</text><rect x="377.0" y="132.1" width="14" height="14" fill="#135d77"/><text x="394.0" y="131.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">D</text><rect x="403.0" y="108.5" width="14" height="14" fill="#135d77"/><text x="420.0" y="107.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">E</text><rect x="366.6" y="99.1" width="14" height="14" fill="#135d77"/><text x="383.6" y="98.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">F</text><path d="M592.0 342.4 L600.5 350.9 L592.0 359.4 L583.5 350.9z" fill="#a54e2c"/><text x="602.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">G</text><path d="M618.0 328.3 L626.5 336.8 L618.0 345.3 L609.5 336.8z" fill="#a54e2c"/><text x="628.0" y="328.8" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">H</text><path d="M566.0 351.8 L574.5 360.3 L566.0 368.8 L557.5 360.3z" fill="#a54e2c"/><text x="576.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">I</text><path d="M150.0 339.9 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><path d="M389.2 109.3 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><path d="M592.0 338.4 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/></svg></div>
+          <figcaption id="hero-caption">The finished result for the worked example: nine customers, three groups, three centres (lime triangles). Every chart in this guide is drawn to scale from the same table.</figcaption>
+        </figure>
+      </header>
+
+      <div class="content">
+        <nav class="contents" aria-label="How this guide is arranged">
+          <strong>How it is arranged</strong>
+          <ol>
+            <li><a href="#question">Sections 01–05: the idea, in pictures</a></li>
+            <li><a href="#choose-k">Sections 06–08: judging and trusting results</a></li>
+            <li><a href="#when">Section 09: when to use it, and when not</a></li>
+            <li><a href="#python">Sections 10–11: running it and describing the groups</a></li>
+            <li><a href="#alternatives">Sections 12–14: other methods, self-check, sources</a></li>
+          </ol>
+        </nav>
+
+        <section id="question" class="section">
+          <div class="section-index"><b>01</b><span>Rows with<br>no labels</span></div>
+          <div class="section-main">
+            <h2>A table with no answer column</h2>
+            <p class="intro">In supervised learning each row arrives with a known answer, such as a house price or "spam / not spam", and the model learns to predict it. Clustering starts without that column. We have measurements for each row and one question: <strong>which rows are similar to each other?</strong></p>
+            <div class="data-stage">
+              <div class="table-wrap">
+                <table aria-label="Worked example: nine customers">
+                  <thead><tr><th>Customer</th><th>Annual spend</th><th>Visits per year</th><th>Group</th></tr></thead>
+                  <tbody><tr><td>A</td><td>£100</td><td>10</td><td>—</td></tr><tr><td>B</td><td>£150</td><td>12</td><td>—</td></tr><tr><td>C</td><td>£200</td><td>8</td><td>—</td></tr><tr><td>D</td><td>£600</td><td>55</td><td>—</td></tr><tr><td>E</td><td>£650</td><td>60</td><td>—</td></tr><tr><td>F</td><td>£580</td><td>62</td><td>—</td></tr><tr><td>G</td><td>£1,000</td><td>10</td><td>—</td></tr><tr><td>H</td><td>£1,050</td><td>13</td><td>—</td></tr><tr><td>I</td><td>£950</td><td>8</td><td>—</td></tr></tbody>
+                </table>
+              </div>
+              <aside>
+                <p>Illustrative teaching data, invented for this guide. It is deliberately small so every calculation can be checked by hand.</p>
+                <strong>0</strong>
+                <p>group labels supplied</p>
+              </aside>
+            </div>
+            <div class="bridge"><strong>What K-Means will add:</strong> a group number for every row. The number is a name tag (0, 1, 2), not an explanation. Working out what each group <em>means</em> is still our job, and Section 11 shows how.</div>
+            <div class="split">
+              <article class="panel"><h3>Typical uses <small>real work</small></h3><ul><li><strong>Customer segmentation:</strong> group shoppers by spend, frequency and recency so marketing can treat them differently.</li><li><strong>Colour reduction:</strong> group the pixels of a photo into K colours to compress it (<a href="https://scikit-learn.org/stable/auto_examples/cluster/plot_color_quantization.html">scikit-learn example</a>).</li><li><strong>Grouping documents or sensors</strong> whose measurements look alike, as a first look before deeper analysis.</li></ul></article>
+              <article class="panel"><h3>What it is not <small>common confusion</small></h3><ul><li>It is not classification. There is no "right answer" column to check against.</li><li>It does not discover how many groups exist. You choose K.</li><li>It does not explain <em>why</em> rows are similar. It only measures how close their numbers are.</li></ul></article>
+            </div>
+          </div>
+        </section>
+
+        <section id="picture" class="section">
+          <div class="section-index"><b>02</b><span>Rows<br>become<br>points</span></div>
+          <div class="section-main">
+            <h2>Each row becomes a point</h2>
+            <p class="intro">Pick two numeric columns and use them as axes. Every customer becomes one dot: across for spend, up for visits. Now "similar" has a picture: dots that sit close together.</p>
+            <figure>
+              <div class="plot"><svg viewBox="0 0 720 460" role="img" aria-labelledby="space-t space-d"><title id="space-t">Customers A to I plotted by spend and visits</title><desc id="space-d">Nine points drawn to scale from the table. A, B and C sit at low spend and few visits; D, E and F at mid spend and many visits; G, H and I at high spend and few visits.</desc><rect width="720" height="460" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="72.0" y1="24" x2="72.0" y2="398"/><line x1="228.0" y1="24" x2="228.0" y2="398"/><line x1="384.0" y1="24" x2="384.0" y2="398"/><line x1="540.0" y1="24" x2="540.0" y2="398"/><line x1="696.0" y1="24" x2="696.0" y2="398"/><line x1="72" y1="398.0" x2="696" y2="398.0"/><line x1="72" y1="303.8" x2="696" y2="303.8"/><line x1="72" y1="209.7" x2="696" y2="209.7"/><line x1="72" y1="115.5" x2="696" y2="115.5"/></g><line x1="72" y1="398" x2="696" y2="398" stroke="#111111" stroke-width="1.5"/><line x1="72" y1="398" x2="72" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="72.0" y="416" text-anchor="middle">£0</text><text x="228.0" y="416" text-anchor="middle">£300</text><text x="384.0" y="416" text-anchor="middle">£600</text><text x="540.0" y="416" text-anchor="middle">£900</text><text x="696.0" y="416" text-anchor="middle">£1,200</text><text x="64" y="402.0" text-anchor="end">0</text><text x="64" y="307.8" text-anchor="end">20</text><text x="64" y="213.7" text-anchor="end">40</text><text x="64" y="119.5" text-anchor="end">60</text><text x="384.0" y="446" text-anchor="middle">annual spend (£)</text><text x="16" y="211.0" transform="rotate(-90 16 211.0)" text-anchor="middle">visits per year</text></g><circle cx="124.0" cy="350.9" r="7" fill="#111111"/><text x="134.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">A</text><circle cx="150.0" cy="341.5" r="7" fill="#111111"/><text x="160.0" y="333.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">B</text><circle cx="176.0" cy="360.3" r="7" fill="#111111"/><text x="186.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">C</text><circle cx="384.0" cy="139.1" r="7" fill="#111111"/><text x="394.0" y="131.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">D</text><circle cx="410.0" cy="115.5" r="7" fill="#111111"/><text x="420.0" y="107.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">E</text><circle cx="373.6" cy="106.1" r="7" fill="#111111"/><text x="383.6" y="98.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">F</text><circle cx="592.0" cy="350.9" r="7" fill="#111111"/><text x="602.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">G</text><circle cx="618.0" cy="336.8" r="7" fill="#111111"/><text x="628.0" y="328.8" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">H</text><circle cx="566.0" cy="360.3" r="7" fill="#111111"/><text x="576.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">I</text></svg></div>
+              <figcaption>Drawn to scale from the table above. Your eye already sees three clumps: A–C, D–F and G–I. K-Means has to find them using arithmetic alone.</figcaption>
+            </figure>
+            <div class="data-key"><span><b>Feature space</b> is the space made by the columns we choose. Two columns give a flat chart; ten columns give a 10-dimensional space that we cannot draw, but the arithmetic works the same way.</span><span><b>Choose columns carefully.</b> A different choice of columns gives a different picture and different groups.</span></div>
+          </div>
+        </section>
+
+        <section id="distance" class="section">
+          <div class="section-index"><b>03</b><span>Distance<br>and<br>scale</span></div>
+          <div class="section-main">
+            <h2>"Near" means a measured distance</h2>
+            <p class="intro">K-Means measures closeness with ordinary straight-line (Euclidean) distance: the length of a ruler laid between two points. Before measuring, we usually put every column on a comparable scale, and this section shows why that matters so much.</p>
+
+            <h3 class="step-title">Step 1: put the columns on the same scale</h3>
+            <p>Spend runs into hundreds of pounds; visits run into tens. Standardising turns each value into "how many standard deviations above or below the column average". A <strong>standard deviation</strong> measures how spread out a column is: roughly, the typical distance of a value from the column's average. So a scaled value of +1 means "one typical step above average", whatever the original units were. This is what scikit-learn's <a href="https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html"><code>StandardScaler</code></a> does.</p>
+            <div class="calc">scaled value = (value − column mean) ÷ column standard deviation<br>spend: mean <b>£587</b>, standard deviation <b>£349</b> &nbsp;·&nbsp; visits: mean <b>26.4</b>, standard deviation <b>23.1</b></div>
+            <div class="table-panel"><table aria-label="Original and standardised values"><thead><tr><th>Customer</th><th>Spend</th><th>Spend (scaled)</th><th>Visits</th><th>Visits (scaled)</th></tr></thead><tbody><tr><td>A</td><td>£100</td><td>-1.39</td><td>10</td><td>-0.71</td></tr><tr><td>B</td><td>£150</td><td>-1.25</td><td>12</td><td>-0.62</td></tr><tr><td>C</td><td>£200</td><td>-1.11</td><td>8</td><td>-0.80</td></tr><tr><td>D</td><td>£600</td><td>0.04</td><td>55</td><td>1.23</td></tr><tr><td>E</td><td>£650</td><td>0.18</td><td>60</td><td>1.45</td></tr><tr><td>F</td><td>£580</td><td>-0.02</td><td>62</td><td>1.54</td></tr><tr><td>G</td><td>£1,000</td><td>1.18</td><td>10</td><td>-0.71</td></tr><tr><td>H</td><td>£1,050</td><td>1.33</td><td>13</td><td>-0.58</td></tr><tr><td>I</td><td>£950</td><td>1.04</td><td>8</td><td>-0.80</td></tr></tbody></table></div>
+
+            <h3 class="step-title">Step 2: measure a distance</h3>
+            <p>Take customers A and D. Subtract their scaled values column by column, square the gaps, add them, and take the square root. This is Pythagoras' theorem.</p>
+            <div class="calc">A = (-1.39, -0.71) &nbsp;&nbsp; D = (0.04, 1.23)<br>gaps: <b>1.43</b> across, <b>1.95</b> up<br>distance = √(1.43² + 1.95²) = <span class="result">2.41</span></div>
+            <figure>
+              <div class="plot"><svg viewBox="0 0 720 460" role="img" aria-labelledby="dist-t dist-d"><title id="dist-t">Two measured distances in the scaled feature space</title><desc id="dist-d">A dashed line from A to D is labelled 2.41; a short solid line from A to B is labelled 0.17.</desc><rect width="720" height="460" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="72.0" y1="24" x2="72.0" y2="398"/><line x1="228.0" y1="24" x2="228.0" y2="398"/><line x1="384.0" y1="24" x2="384.0" y2="398"/><line x1="540.0" y1="24" x2="540.0" y2="398"/><line x1="696.0" y1="24" x2="696.0" y2="398"/><line x1="72" y1="398.0" x2="696" y2="398.0"/><line x1="72" y1="303.8" x2="696" y2="303.8"/><line x1="72" y1="209.7" x2="696" y2="209.7"/><line x1="72" y1="115.5" x2="696" y2="115.5"/></g><line x1="72" y1="398" x2="696" y2="398" stroke="#111111" stroke-width="1.5"/><line x1="72" y1="398" x2="72" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="72.0" y="416" text-anchor="middle">£0</text><text x="228.0" y="416" text-anchor="middle">£300</text><text x="384.0" y="416" text-anchor="middle">£600</text><text x="540.0" y="416" text-anchor="middle">£900</text><text x="696.0" y="416" text-anchor="middle">£1,200</text><text x="64" y="402.0" text-anchor="end">0</text><text x="64" y="307.8" text-anchor="end">20</text><text x="64" y="213.7" text-anchor="end">40</text><text x="64" y="119.5" text-anchor="end">60</text><text x="384.0" y="446" text-anchor="middle">annual spend (£)</text><text x="16" y="211.0" transform="rotate(-90 16 211.0)" text-anchor="middle">visits per year</text></g><circle cx="124.0" cy="350.9" r="7" fill="#111111"/><text x="134.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">A</text><circle cx="150.0" cy="341.5" r="7" fill="#111111"/><text x="160.0" y="333.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">B</text><circle cx="176.0" cy="360.3" r="7" fill="#111111"/><text x="186.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">C</text><circle cx="384.0" cy="139.1" r="7" fill="#111111"/><text x="394.0" y="131.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">D</text><circle cx="410.0" cy="115.5" r="7" fill="#111111"/><text x="420.0" y="107.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">E</text><circle cx="373.6" cy="106.1" r="7" fill="#111111"/><text x="383.6" y="98.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">F</text><circle cx="592.0" cy="350.9" r="7" fill="#111111"/><text x="602.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">G</text><circle cx="618.0" cy="336.8" r="7" fill="#111111"/><text x="628.0" y="328.8" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">H</text><circle cx="566.0" cy="360.3" r="7" fill="#111111"/><text x="576.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">I</text><line x1="124.0" y1="350.9" x2="384.0" y2="139.1" stroke="#a54e2c" stroke-width="2" stroke-dasharray="6 4"/><text x="262.0" y="245.0" fill="#a54e2c" font-family="DM Mono, ui-monospace, monospace" font-size="12">A→D = 2.41</text><line x1="124.0" y1="350.9" x2="150.0" y2="341.5" stroke="#135d77" stroke-width="3"/><text x="120.0" y="380.9" fill="#135d77" font-family="DM Mono, ui-monospace, monospace" font-size="12">A→B = 0.17</text></svg></div>
+              <figcaption>The charts in this guide are drawn so that one standard deviation is the same length on both axes. That means the distances you see on screen match the distances K-Means calculates.</figcaption>
+            </figure>
+
+            <h3 class="step-title">Why scaling changes the answer</h3>
+            <p>A second small example (customers P–W) shows what goes wrong without scaling. Four customers visit about 4 times a year and four visit about 34 times. Their spending is spread widely in both sets.</p>
+            <div class="table-panel"><table aria-label="Scaling example customers"><thead><tr><th>Customer</th><th>Spend</th><th>Visits</th></tr></thead><tbody><tr><td>P</td><td>£200</td><td>3</td></tr><tr><td>Q</td><td>£600</td><td>5</td></tr><tr><td>R</td><td>£950</td><td>4</td></tr><tr><td>S</td><td>£1,500</td><td>6</td></tr><tr><td>T</td><td>£250</td><td>32</td></tr><tr><td>U</td><td>£650</td><td>35</td></tr><tr><td>V</td><td>£1,000</td><td>33</td></tr><tr><td>W</td><td>£1,550</td><td>36</td></tr></tbody></table></div>
+            <div class="split">
+              <article class="panel"><h3>Raw units <small>groups: PQTU / RSVW</small></h3><svg viewBox="0 0 520 230" role="img" aria-labelledby="scraw-t scraw-d"><title id="scraw-t">Raw units: spend dominates distance</title><desc id="scraw-d">Eight customers drawn with one pound and one visit at the same length. The visits range is so small that every point sits almost on the spend axis. K-Means with K=2 splits them by spend into PQTU / RSVW.</desc><rect width="520" height="230" fill="#fff"/><line x1="40" y1="150" x2="500" y2="150" stroke="#111111" stroke-width="1.5"/><line x1="40" y1="150" x2="40" y2="138.5" stroke="#111111" stroke-width="1.5"/><circle cx="97.5" cy="149.1" r="6" fill="#111111"/><text x="93.5" y="170" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">P</text><circle cx="212.5" cy="148.6" r="6" fill="#111111"/><text x="208.5" y="184" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">Q</text><rect x="307.1" y="142.8" width="12" height="12" fill="#135d77"/><text x="309.1" y="170" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">R</text><rect x="465.2" y="142.3" width="12" height="12" fill="#135d77"/><text x="467.2" y="184" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">S</text><circle cx="111.9" cy="140.8" r="6" fill="#111111"/><text x="107.9" y="170" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">T</text><circle cx="226.9" cy="139.9" r="6" fill="#111111"/><text x="222.9" y="184" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">U</text><rect x="321.5" y="134.5" width="12" height="12" fill="#135d77"/><text x="323.5" y="170" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">V</text><rect x="479.6" y="133.7" width="12" height="12" fill="#135d77"/><text x="481.6" y="184" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">W</text><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11"><text x="40" y="30">£1 of spend and 1 visit drawn the same length</text><text x="40" y="48">visits (0–36) barely lift off the axis</text><text x="40" y="222">£0</text><text x="460" y="222">£1,600</text></g></svg><p>In raw units a £1 difference counts the same as one visit. A 30-visit gap is worth only £30, so K-Means splits the customers by spend and ignores visits almost completely.</p></article>
+              <article class="panel"><h3>Standardised <small>groups: PQRS / TUVW</small></h3><svg viewBox="0 0 520 300" role="img" aria-labelledby="scstd-t scstd-d"><title id="scstd-t">Standardised: both features count</title><desc id="scstd-d">The same eight customers drawn with each axis spanning the same number of standard deviations. K-Means with K=2 now splits them by visits into PQRS / TUVW.</desc><rect width="520" height="300" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="56.0" y1="18" x2="56.0" y2="252"/><line x1="276.0" y1="18" x2="276.0" y2="252"/><line x1="496.0" y1="18" x2="496.0" y2="252"/><line x1="56" y1="252.0" x2="496" y2="252.0"/><line x1="56" y1="157.6" x2="496" y2="157.6"/><line x1="56" y1="63.2" x2="496" y2="63.2"/></g><line x1="56" y1="252" x2="496" y2="252" stroke="#111111" stroke-width="1.5"/><line x1="56" y1="252" x2="56" y2="18" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="56.0" y="270" text-anchor="middle">£0</text><text x="276.0" y="270" text-anchor="middle">£800</text><text x="496.0" y="270" text-anchor="middle">£1,600</text><text x="48" y="256.0" text-anchor="end">0</text><text x="48" y="161.6" text-anchor="end">20</text><text x="48" y="67.2" text-anchor="end">40</text><text x="276.0" y="286" text-anchor="middle">annual spend (£)</text><text x="16" y="135.0" transform="rotate(-90 16 135.0)" text-anchor="middle">visits</text></g><circle cx="111.0" cy="237.8" r="6" fill="#111111"/><text x="119.0" y="230.8" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">P</text><circle cx="221.0" cy="228.4" r="6" fill="#111111"/><text x="229.0" y="221.4" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">Q</text><circle cx="317.2" cy="233.1" r="6" fill="#111111"/><text x="325.2" y="226.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">R</text><circle cx="468.5" cy="223.7" r="6" fill="#111111"/><text x="476.5" y="216.7" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">S</text><rect x="118.8" y="94.9" width="12" height="12" fill="#135d77"/><text x="132.8" y="93.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">T</text><rect x="228.8" y="80.8" width="12" height="12" fill="#135d77"/><text x="242.8" y="79.8" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">U</text><rect x="325.0" y="90.2" width="12" height="12" fill="#135d77"/><text x="339.0" y="89.2" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">V</text><rect x="476.2" y="76.1" width="12" height="12" fill="#135d77"/><text x="490.2" y="75.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">W</text></svg><p>After standardising, both columns have a fair say. K-Means now separates the rare visitors (P–S) from the frequent ones (T–W).</p></article>
+            </div>
+            <div class="note"><strong>Scaling is a decision, not a ritual.</strong> Standardising says "treat one standard deviation of each column as equally important". Usually that is what you want. Sometimes the raw units carry real meaning and you may choose not to scale, or to weight a column. Either way, state which version K-Means received. Scaling is also sensitive to outliers, because one extreme value stretches the standard deviation (<a href="https://scikit-learn.org/stable/modules/preprocessing.html#standardization-or-mean-removal-and-variance-scaling">scikit-learn preprocessing guide</a>).</div>
+          </div>
+        </section>
+
+        <section id="loop" class="section">
+          <div class="section-index"><b>04</b><span>The loop,<br>step by<br>step</span></div>
+          <div class="section-main">
+            <h2>Assign, move, repeat</h2>
+            <p class="intro">K-Means does not look at the chart and "see" groups. It runs a short loop, usually called Lloyd's algorithm: place K centres, give each row to its nearest centre, move each centre to the average of its rows, and repeat until nothing changes (<a href="https://scikit-learn.org/stable/modules/clustering.html#k-means">scikit-learn clustering guide</a>).</p>
+            <div class="workflow" aria-label="Six stages of the K-Means loop">
+              <article class="flow-step"><div class="flow-num">01</div><h3>Choose K</h3><p>How many groups to look for. You supply this number.</p></article>
+              <article class="flow-step"><div class="flow-num">02</div><h3>Start</h3><p>Place K centres. Here they start on real rows; scikit-learn uses a smarter spread (Section 07).</p></article>
+              <article class="flow-step active"><div class="flow-num">03</div><h3>Assign</h3><p>Each row joins the centre it is closest to.</p></article>
+              <article class="flow-step active"><div class="flow-num">04</div><h3>Update</h3><p>Each centre moves to the mean position of the rows that joined it.</p></article>
+              <article class="flow-step"><div class="flow-num">05</div><h3>Repeat</h3><p>Go back to Assign. Stop when no row changes group.</p></article>
+              <article class="flow-step"><div class="flow-num">06</div><h3>Inspect</h3><p>Describe the groups and check they are useful (Sections 06 and 11).</p></article>
+            </div>
+
+            <h3 class="step-title">Try it: run the loop yourself</h3>
+            <p>Pick a starting position, then press <strong>Next step</strong>. Each press does one Assign or one Update, exactly as in the diagram above. Watch the inertia number (Section 05 explains it) fall as the groups tidy up.</p>
+            <div class="stepper" id="stepper">
+              <div class="stepper-top">
+              <div class="stepper-bar" role="group" aria-label="Choose starting centres">
+                <span>Start centres on</span>
+                <button type="button" data-start="recover" aria-pressed="true">A, B, F</button>
+                <button type="button" data-start="spread" aria-pressed="false">A, E, H</button>
+                <button type="button" data-start="stuck" aria-pressed="false">A, C, G</button>
+              </div>
+              <div class="stepper-controls">
+                <button type="button" id="step-next">Next step</button>
+                <button type="button" id="step-run">Run to the end</button>
+                <button type="button" id="step-reset">Reset</button>
+              </div>
+              <div class="stepper-status" aria-live="polite">
+                <div><strong>Stage</strong><span id="st-stage">start</span></div>
+                <div><strong>Round</strong><span id="st-round">0</span></div>
+                <div><strong>Inertia</strong><span id="st-inertia">—</span></div>
+                <div><strong>Groups</strong><span id="st-groups">—</span></div>
+              </div>
+              </div>
+              <div class="stepper-body">
+                <div id="stepper-plot" aria-live="off"></div>
+                <aside class="stepper-explain" aria-live="polite">
+                  <p class="ex-kicker" id="ex-kicker">Step 0</p>
+                  <h4 id="ex-title">Ready to start</h4>
+                  <p class="ex-label">What is happening</p><p id="ex-what"></p>
+                  <p class="ex-label">What changed on the chart</p><p id="ex-change"></p>
+                  <p class="ex-label">Why it matters</p><p id="ex-why"></p>
+                </aside>
+              </div>
+            </div>
+            <p class="profile-note">Try all three starts. Starting on A, B, F recovers the clean groups after 2 rounds of moves; the next Assign confirms that nothing changes. Starting on A, E, H (one centre in each clump) gets there almost at once. Starting on A, C, G gets stuck. Section 07 explains why.</p>
+
+            <h3 class="step-title">The same run as still frames</h3>
+            <p>Here is every step of the A, B, F run. Inertia after each assignment: 17.69 → 5.73 → 0.19.</p>
+            <div class="frames"><figure class="frame"><div class="plot"><svg viewBox="0 0 360 260" role="img" aria-labelledby="fr0-t fr0-d"><title id="fr0-t">Start: centres placed on rows A, B, F</title><desc id="fr0-d">Start: centres placed on rows A, B, F.</desc><rect width="360" height="260" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="40.0" y1="14" x2="40.0" y2="226"/><line x1="194.0" y1="14" x2="194.0" y2="226"/><line x1="348.0" y1="14" x2="348.0" y2="226"/><line x1="40" y1="226.0" x2="348" y2="226.0"/><line x1="40" y1="119.3" x2="348" y2="119.3"/></g><line x1="40" y1="226" x2="348" y2="226" stroke="#111111" stroke-width="1.5"/><line x1="40" y1="226" x2="40" y2="14" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="40.0" y="244" text-anchor="middle"></text><text x="194.0" y="244" text-anchor="middle"></text><text x="348.0" y="244" text-anchor="middle"></text><text x="32" y="230.0" text-anchor="end"></text><text x="32" y="123.3" text-anchor="end"></text><text x="194.0" y="246" text-anchor="middle">spend</text><text x="16" y="120.0" transform="rotate(-90 16 120.0)" text-anchor="middle">visits</text></g><circle cx="65.7" cy="199.3" r="5" fill="#9c9c94"/><text x="72.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">A</text><circle cx="78.5" cy="194.0" r="5" fill="#9c9c94"/><text x="85.5" y="188.0" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">B</text><circle cx="91.3" cy="204.7" r="5" fill="#9c9c94"/><text x="98.3" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">C</text><circle cx="194.0" cy="79.2" r="5" fill="#9c9c94"/><text x="201.0" y="73.2" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">D</text><circle cx="206.8" cy="65.9" r="5" fill="#9c9c94"/><text x="213.8" y="59.9" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">E</text><circle cx="188.9" cy="60.6" r="5" fill="#9c9c94"/><text x="195.9" y="54.6" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">F</text><circle cx="296.7" cy="199.3" r="5" fill="#9c9c94"/><text x="303.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">G</text><circle cx="309.5" cy="191.3" r="5" fill="#9c9c94"/><text x="316.5" y="185.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">H</text><circle cx="283.8" cy="204.7" r="5" fill="#9c9c94"/><text x="290.8" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">I</text><path d="M65.7 188.3 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="65.7" y="223.3" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c1</text><path d="M78.5 183.0 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="78.5" y="218.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c2</text><path d="M188.9 49.6 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="188.9" y="84.6" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c3</text></svg></div><figcaption><b>0</b> Start: centres placed on rows A, B, F</figcaption></figure><figure class="frame"><div class="plot"><svg viewBox="0 0 360 260" role="img" aria-labelledby="fr1-t fr1-d"><title id="fr1-t">Round 1 assign: every row joins its nearest centre</title><desc id="fr1-d">Round 1 assign: every row joins its nearest centre.</desc><rect width="360" height="260" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="40.0" y1="14" x2="40.0" y2="226"/><line x1="194.0" y1="14" x2="194.0" y2="226"/><line x1="348.0" y1="14" x2="348.0" y2="226"/><line x1="40" y1="226.0" x2="348" y2="226.0"/><line x1="40" y1="119.3" x2="348" y2="119.3"/></g><line x1="40" y1="226" x2="348" y2="226" stroke="#111111" stroke-width="1.5"/><line x1="40" y1="226" x2="40" y2="14" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="40.0" y="244" text-anchor="middle"></text><text x="194.0" y="244" text-anchor="middle"></text><text x="348.0" y="244" text-anchor="middle"></text><text x="32" y="230.0" text-anchor="end"></text><text x="32" y="123.3" text-anchor="end"></text><text x="194.0" y="246" text-anchor="middle">spend</text><text x="16" y="120.0" transform="rotate(-90 16 120.0)" text-anchor="middle">visits</text></g><circle cx="65.7" cy="199.3" r="5" fill="#111111"/><text x="72.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">A</text><rect x="73.5" y="189.0" width="10" height="10" fill="#135d77"/><text x="85.5" y="188.0" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">B</text><rect x="86.3" y="199.7" width="10" height="10" fill="#135d77"/><text x="98.3" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">C</text><path d="M194.0 72.7 L200.5 79.2 L194.0 85.7 L187.5 79.2z" fill="#a54e2c"/><text x="201.0" y="73.2" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">D</text><path d="M206.8 59.4 L213.3 65.9 L206.8 72.4 L200.3 65.9z" fill="#a54e2c"/><text x="213.8" y="59.9" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">E</text><path d="M188.9 54.1 L195.4 60.6 L188.9 67.1 L182.4 60.6z" fill="#a54e2c"/><text x="195.9" y="54.6" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">F</text><rect x="291.7" y="194.3" width="10" height="10" fill="#135d77"/><text x="303.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">G</text><path d="M309.5 184.8 L316.0 191.3 L309.5 197.8 L303.0 191.3z" fill="#a54e2c"/><text x="316.5" y="185.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">H</text><rect x="278.8" y="199.7" width="10" height="10" fill="#135d77"/><text x="290.8" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">I</text><path d="M65.7 188.3 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="65.7" y="223.3" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c1</text><path d="M78.5 183.0 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="78.5" y="218.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c2</text><path d="M188.9 49.6 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="188.9" y="84.6" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c3</text></svg></div><figcaption><b>1</b> Round 1 assign: every row joins its nearest centre</figcaption></figure><figure class="frame"><div class="plot"><svg viewBox="0 0 360 260" role="img" aria-labelledby="fr2-t fr2-d"><title id="fr2-t">Round 1 update: each centre moves to the mean of its members</title><desc id="fr2-d">Round 1 update: each centre moves to the mean of its members.</desc><rect width="360" height="260" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="40.0" y1="14" x2="40.0" y2="226"/><line x1="194.0" y1="14" x2="194.0" y2="226"/><line x1="348.0" y1="14" x2="348.0" y2="226"/><line x1="40" y1="226.0" x2="348" y2="226.0"/><line x1="40" y1="119.3" x2="348" y2="119.3"/></g><line x1="40" y1="226" x2="348" y2="226" stroke="#111111" stroke-width="1.5"/><line x1="40" y1="226" x2="40" y2="14" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="40.0" y="244" text-anchor="middle"></text><text x="194.0" y="244" text-anchor="middle"></text><text x="348.0" y="244" text-anchor="middle"></text><text x="32" y="230.0" text-anchor="end"></text><text x="32" y="123.3" text-anchor="end"></text><text x="194.0" y="246" text-anchor="middle">spend</text><text x="16" y="120.0" transform="rotate(-90 16 120.0)" text-anchor="middle">visits</text></g><circle cx="65.7" cy="199.3" r="5" fill="#111111"/><text x="72.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">A</text><rect x="73.5" y="189.0" width="10" height="10" fill="#135d77"/><text x="85.5" y="188.0" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">B</text><rect x="86.3" y="199.7" width="10" height="10" fill="#135d77"/><text x="98.3" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">C</text><path d="M194.0 72.7 L200.5 79.2 L194.0 85.7 L187.5 79.2z" fill="#a54e2c"/><text x="201.0" y="73.2" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">D</text><path d="M206.8 59.4 L213.3 65.9 L206.8 72.4 L200.3 65.9z" fill="#a54e2c"/><text x="213.8" y="59.9" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">E</text><path d="M188.9 54.1 L195.4 60.6 L188.9 67.1 L182.4 60.6z" fill="#a54e2c"/><text x="195.9" y="54.6" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">F</text><rect x="291.7" y="194.3" width="10" height="10" fill="#135d77"/><text x="303.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">G</text><path d="M309.5 184.8 L316.0 191.3 L309.5 197.8 L303.0 191.3z" fill="#a54e2c"/><text x="316.5" y="185.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">H</text><rect x="278.8" y="199.7" width="10" height="10" fill="#135d77"/><text x="290.8" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">I</text><path d="M65.7 188.3 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="65.7" y="223.3" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c1</text><path d="M187.6 189.6 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="187.6" y="224.6" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c2</text><path d="M224.8 88.2 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="224.8" y="123.2" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c3</text></svg></div><figcaption><b>2</b> Round 1 update: each centre moves to the mean of its members</figcaption></figure><figure class="frame"><div class="plot"><svg viewBox="0 0 360 260" role="img" aria-labelledby="fr3-t fr3-d"><title id="fr3-t">Round 2 assign: B, C, H change group</title><desc id="fr3-d">Round 2 assign: B, C, H change group.</desc><rect width="360" height="260" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="40.0" y1="14" x2="40.0" y2="226"/><line x1="194.0" y1="14" x2="194.0" y2="226"/><line x1="348.0" y1="14" x2="348.0" y2="226"/><line x1="40" y1="226.0" x2="348" y2="226.0"/><line x1="40" y1="119.3" x2="348" y2="119.3"/></g><line x1="40" y1="226" x2="348" y2="226" stroke="#111111" stroke-width="1.5"/><line x1="40" y1="226" x2="40" y2="14" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="40.0" y="244" text-anchor="middle"></text><text x="194.0" y="244" text-anchor="middle"></text><text x="348.0" y="244" text-anchor="middle"></text><text x="32" y="230.0" text-anchor="end"></text><text x="32" y="123.3" text-anchor="end"></text><text x="194.0" y="246" text-anchor="middle">spend</text><text x="16" y="120.0" transform="rotate(-90 16 120.0)" text-anchor="middle">visits</text></g><circle cx="65.7" cy="199.3" r="5" fill="#111111"/><text x="72.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">A</text><circle cx="78.5" cy="194.0" r="5" fill="#111111"/><text x="85.5" y="188.0" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">B</text><circle cx="91.3" cy="204.7" r="5" fill="#111111"/><text x="98.3" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">C</text><path d="M194.0 72.7 L200.5 79.2 L194.0 85.7 L187.5 79.2z" fill="#a54e2c"/><text x="201.0" y="73.2" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">D</text><path d="M206.8 59.4 L213.3 65.9 L206.8 72.4 L200.3 65.9z" fill="#a54e2c"/><text x="213.8" y="59.9" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">E</text><path d="M188.9 54.1 L195.4 60.6 L188.9 67.1 L182.4 60.6z" fill="#a54e2c"/><text x="195.9" y="54.6" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">F</text><rect x="291.7" y="194.3" width="10" height="10" fill="#135d77"/><text x="303.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">G</text><rect x="304.5" y="186.3" width="10" height="10" fill="#135d77"/><text x="316.5" y="185.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">H</text><rect x="278.8" y="199.7" width="10" height="10" fill="#135d77"/><text x="290.8" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">I</text><path d="M65.7 188.3 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="65.7" y="223.3" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c1</text><path d="M187.6 189.6 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="187.6" y="224.6" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c2</text><path d="M224.8 88.2 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="224.8" y="123.2" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c3</text></svg></div><figcaption><b>3</b> Round 2 assign: B, C, H change group</figcaption></figure><figure class="frame"><div class="plot"><svg viewBox="0 0 360 260" role="img" aria-labelledby="fr4-t fr4-d"><title id="fr4-t">Round 2 update: each centre moves to the mean of its members</title><desc id="fr4-d">Round 2 update: each centre moves to the mean of its members.</desc><rect width="360" height="260" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="40.0" y1="14" x2="40.0" y2="226"/><line x1="194.0" y1="14" x2="194.0" y2="226"/><line x1="348.0" y1="14" x2="348.0" y2="226"/><line x1="40" y1="226.0" x2="348" y2="226.0"/><line x1="40" y1="119.3" x2="348" y2="119.3"/></g><line x1="40" y1="226" x2="348" y2="226" stroke="#111111" stroke-width="1.5"/><line x1="40" y1="226" x2="40" y2="14" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="40.0" y="244" text-anchor="middle"></text><text x="194.0" y="244" text-anchor="middle"></text><text x="348.0" y="244" text-anchor="middle"></text><text x="32" y="230.0" text-anchor="end"></text><text x="32" y="123.3" text-anchor="end"></text><text x="194.0" y="246" text-anchor="middle">spend</text><text x="16" y="120.0" transform="rotate(-90 16 120.0)" text-anchor="middle">visits</text></g><circle cx="65.7" cy="199.3" r="5" fill="#111111"/><text x="72.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">A</text><circle cx="78.5" cy="194.0" r="5" fill="#111111"/><text x="85.5" y="188.0" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">B</text><circle cx="91.3" cy="204.7" r="5" fill="#111111"/><text x="98.3" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">C</text><path d="M194.0 72.7 L200.5 79.2 L194.0 85.7 L187.5 79.2z" fill="#a54e2c"/><text x="201.0" y="73.2" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">D</text><path d="M206.8 59.4 L213.3 65.9 L206.8 72.4 L200.3 65.9z" fill="#a54e2c"/><text x="213.8" y="59.9" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">E</text><path d="M188.9 54.1 L195.4 60.6 L188.9 67.1 L182.4 60.6z" fill="#a54e2c"/><text x="195.9" y="54.6" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">F</text><rect x="291.7" y="194.3" width="10" height="10" fill="#135d77"/><text x="303.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">G</text><rect x="304.5" y="186.3" width="10" height="10" fill="#135d77"/><text x="316.5" y="185.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">H</text><rect x="278.8" y="199.7" width="10" height="10" fill="#135d77"/><text x="290.8" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">I</text><path d="M78.5 188.3 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="78.5" y="223.3" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c1</text><path d="M296.7 187.4 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="296.7" y="222.4" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c2</text><path d="M196.6 57.6 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="196.6" y="92.6" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c3</text></svg></div><figcaption><b>4</b> Round 2 update: each centre moves to the mean of its members</figcaption></figure><figure class="frame"><div class="plot"><svg viewBox="0 0 360 260" role="img" aria-labelledby="fr5-t fr5-d"><title id="fr5-t">Round 3 assign: no row changes group, so the loop stops</title><desc id="fr5-d">Round 3 assign: no row changes group, so the loop stops.</desc><rect width="360" height="260" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="40.0" y1="14" x2="40.0" y2="226"/><line x1="194.0" y1="14" x2="194.0" y2="226"/><line x1="348.0" y1="14" x2="348.0" y2="226"/><line x1="40" y1="226.0" x2="348" y2="226.0"/><line x1="40" y1="119.3" x2="348" y2="119.3"/></g><line x1="40" y1="226" x2="348" y2="226" stroke="#111111" stroke-width="1.5"/><line x1="40" y1="226" x2="40" y2="14" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="40.0" y="244" text-anchor="middle"></text><text x="194.0" y="244" text-anchor="middle"></text><text x="348.0" y="244" text-anchor="middle"></text><text x="32" y="230.0" text-anchor="end"></text><text x="32" y="123.3" text-anchor="end"></text><text x="194.0" y="246" text-anchor="middle">spend</text><text x="16" y="120.0" transform="rotate(-90 16 120.0)" text-anchor="middle">visits</text></g><circle cx="65.7" cy="199.3" r="5" fill="#111111"/><text x="72.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">A</text><circle cx="78.5" cy="194.0" r="5" fill="#111111"/><text x="85.5" y="188.0" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">B</text><circle cx="91.3" cy="204.7" r="5" fill="#111111"/><text x="98.3" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">C</text><path d="M194.0 72.7 L200.5 79.2 L194.0 85.7 L187.5 79.2z" fill="#a54e2c"/><text x="201.0" y="73.2" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">D</text><path d="M206.8 59.4 L213.3 65.9 L206.8 72.4 L200.3 65.9z" fill="#a54e2c"/><text x="213.8" y="59.9" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">E</text><path d="M188.9 54.1 L195.4 60.6 L188.9 67.1 L182.4 60.6z" fill="#a54e2c"/><text x="195.9" y="54.6" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">F</text><rect x="291.7" y="194.3" width="10" height="10" fill="#135d77"/><text x="303.7" y="193.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">G</text><rect x="304.5" y="186.3" width="10" height="10" fill="#135d77"/><text x="316.5" y="185.3" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">H</text><rect x="278.8" y="199.7" width="10" height="10" fill="#135d77"/><text x="290.8" y="198.7" font-family="DM Mono, ui-monospace, monospace" font-size="10" fill="#111111">I</text><path d="M78.5 188.3 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="78.5" y="223.3" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c1</text><path d="M296.7 187.4 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="296.7" y="222.4" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c2</text><path d="M196.6 57.6 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="196.6" y="92.6" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">c3</text></svg></div><figcaption><b>5</b> Round 3 assign: no row changes group, so the loop stops</figcaption></figure></div>
+            <div class="bridge"><strong>Two facts to hold on to.</strong> A centre is an average position, so it usually sits between rows rather than on one. And the loop always stops, because each Assign and each Update can only keep the total cost the same or make it smaller.</div>
+          </div>
+        </section>
+
+        <section id="cost" class="section">
+          <div class="section-index"><b>05</b><span>What it<br>minimises</span></div>
+          <div class="section-main">
+            <h2>One number measures how tight the groups are</h2>
+            <p class="intro">Draw a line from every row to its own group centre. Square each line's length and add them all up. That total is called <strong>inertia</strong>, or the <strong>within-cluster sum of squares (WCSS)</strong>. K-Means is trying to make this number as small as possible (<a href="https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html">scikit-learn KMeans reference</a>).</p>
+            <figure>
+              <div class="plot"><svg viewBox="0 0 720 460" role="img" aria-labelledby="inr-t inr-d"><title id="inr-t">Each row linked to its own centre</title><desc id="inr-d">Nine customers in three groups, each joined by a dashed line to its group centre. The centres sit at the mean of their three members.</desc><rect width="720" height="460" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="72.0" y1="24" x2="72.0" y2="398"/><line x1="228.0" y1="24" x2="228.0" y2="398"/><line x1="384.0" y1="24" x2="384.0" y2="398"/><line x1="540.0" y1="24" x2="540.0" y2="398"/><line x1="696.0" y1="24" x2="696.0" y2="398"/><line x1="72" y1="398.0" x2="696" y2="398.0"/><line x1="72" y1="303.8" x2="696" y2="303.8"/><line x1="72" y1="209.7" x2="696" y2="209.7"/><line x1="72" y1="115.5" x2="696" y2="115.5"/></g><line x1="72" y1="398" x2="696" y2="398" stroke="#111111" stroke-width="1.5"/><line x1="72" y1="398" x2="72" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="72.0" y="416" text-anchor="middle">£0</text><text x="228.0" y="416" text-anchor="middle">£300</text><text x="384.0" y="416" text-anchor="middle">£600</text><text x="540.0" y="416" text-anchor="middle">£900</text><text x="696.0" y="416" text-anchor="middle">£1,200</text><text x="64" y="402.0" text-anchor="end">0</text><text x="64" y="307.8" text-anchor="end">20</text><text x="64" y="213.7" text-anchor="end">40</text><text x="64" y="119.5" text-anchor="end">60</text><text x="384.0" y="446" text-anchor="middle">annual spend (£)</text><text x="16" y="211.0" transform="rotate(-90 16 211.0)" text-anchor="middle">visits per year</text></g><line x1="124.0" y1="350.9" x2="150.0" y2="350.9" stroke="#a54e2c" stroke-width="1.4" stroke-dasharray="4 3"/><line x1="150.0" y1="341.5" x2="150.0" y2="350.9" stroke="#a54e2c" stroke-width="1.4" stroke-dasharray="4 3"/><line x1="176.0" y1="360.3" x2="150.0" y2="350.9" stroke="#a54e2c" stroke-width="1.4" stroke-dasharray="4 3"/><line x1="384.0" y1="139.1" x2="389.2" y2="120.3" stroke="#a54e2c" stroke-width="1.4" stroke-dasharray="4 3"/><line x1="410.0" y1="115.5" x2="389.2" y2="120.3" stroke="#a54e2c" stroke-width="1.4" stroke-dasharray="4 3"/><line x1="373.6" y1="106.1" x2="389.2" y2="120.3" stroke="#a54e2c" stroke-width="1.4" stroke-dasharray="4 3"/><line x1="592.0" y1="350.9" x2="592.0" y2="349.4" stroke="#a54e2c" stroke-width="1.4" stroke-dasharray="4 3"/><line x1="618.0" y1="336.8" x2="592.0" y2="349.4" stroke="#a54e2c" stroke-width="1.4" stroke-dasharray="4 3"/><line x1="566.0" y1="360.3" x2="592.0" y2="349.4" stroke="#a54e2c" stroke-width="1.4" stroke-dasharray="4 3"/><circle cx="124.0" cy="350.9" r="7" fill="#111111"/><text x="134.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">A</text><circle cx="150.0" cy="341.5" r="7" fill="#111111"/><text x="160.0" y="333.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">B</text><circle cx="176.0" cy="360.3" r="7" fill="#111111"/><text x="186.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">C</text><rect x="377.0" y="132.1" width="14" height="14" fill="#135d77"/><text x="394.0" y="131.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">D</text><rect x="403.0" y="108.5" width="14" height="14" fill="#135d77"/><text x="420.0" y="107.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">E</text><rect x="366.6" y="99.1" width="14" height="14" fill="#135d77"/><text x="383.6" y="98.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">F</text><path d="M592.0 342.4 L600.5 350.9 L592.0 359.4 L583.5 350.9z" fill="#a54e2c"/><text x="602.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">G</text><path d="M618.0 328.3 L626.5 336.8 L618.0 345.3 L609.5 336.8z" fill="#a54e2c"/><text x="628.0" y="328.8" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">H</text><path d="M566.0 351.8 L574.5 360.3 L566.0 368.8 L557.5 360.3z" fill="#a54e2c"/><text x="576.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">I</text><path d="M150.0 339.9 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="150.0" y="374.9" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">centre 0</text><path d="M389.2 109.3 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="389.2" y="144.3" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">centre 1</text><path d="M592.0 338.4 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="592.0" y="373.4" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">centre 2</text></svg></div>
+              <figcaption>Every dashed line is one term in the inertia total. Short lines mean a tight group.</figcaption>
+            </figure>
+            <div class="table-panel"><table aria-label="Inertia worked out row by row"><thead><tr><th>Customer</th><th>Group</th><th>Distance to centre</th><th>Squared</th></tr></thead><tbody><tr><td>A</td><td>0</td><td>0.143</td><td>0.020</td></tr><tr><td>B</td><td>0</td><td>0.086</td><td>0.007</td></tr><tr><td>C</td><td>0</td><td>0.167</td><td>0.028</td></tr><tr><td>D</td><td>1</td><td>0.175</td><td>0.031</td></tr><tr><td>E</td><td>1</td><td>0.122</td><td>0.015</td></tr><tr><td>F</td><td>1</td><td>0.156</td><td>0.024</td></tr><tr><td>G</td><td>2</td><td>0.014</td><td>0.000</td></tr><tr><td>H</td><td>2</td><td>0.184</td><td>0.034</td></tr><tr><td>I</td><td>2</td><td>0.175</td><td>0.031</td></tr></tbody></table></div>
+            <div class="calc">inertia = sum of the "Squared" column = <span class="result">0.190</span> &nbsp;(scaled units)</div>
+
+            <h3 class="step-title">Why the centre is the mean</h3>
+            <p>The Update step moves each centre to the average of its rows. That is not an arbitrary choice: for a sum of <em>squared</em> distances, the average is the single position that gives the smallest total. Take the spend of A, B and C (£100, £150, £200) and try every possible centre:</p>
+            <figure>
+              <div class="plot"><svg viewBox="0 0 720 320" role="img" aria-labelledby="mean-t mean-d"><title id="mean-t">The mean gives the smallest squared total</title><desc id="mean-d">A U-shaped curve of the sum of squared gaps for candidate centres from £0 to £300. The lowest point is at £150, the mean of £100, £150 and £200, where the total is 5,000. A centre placed on A gives 12,500.</desc><rect width="720" height="320" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="86.0" y1="24" x2="86.0" y2="264"/><line x1="187.7" y1="24" x2="187.7" y2="264"/><line x1="289.3" y1="24" x2="289.3" y2="264"/><line x1="391.0" y1="24" x2="391.0" y2="264"/><line x1="492.7" y1="24" x2="492.7" y2="264"/><line x1="594.3" y1="24" x2="594.3" y2="264"/><line x1="696.0" y1="24" x2="696.0" y2="264"/><line x1="86" y1="264.0" x2="696" y2="264.0"/><line x1="86" y1="184.0" x2="696" y2="184.0"/><line x1="86" y1="104.0" x2="696" y2="104.0"/><line x1="86" y1="24.0" x2="696" y2="24.0"/></g><line x1="86" y1="264" x2="696" y2="264" stroke="#111111" stroke-width="1.5"/><line x1="86" y1="264" x2="86" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="86.0" y="282" text-anchor="middle">£0</text><text x="187.7" y="282" text-anchor="middle">£50</text><text x="289.3" y="282" text-anchor="middle">£100</text><text x="391.0" y="282" text-anchor="middle">£150</text><text x="492.7" y="282" text-anchor="middle">£200</text><text x="594.3" y="282" text-anchor="middle">£250</text><text x="696.0" y="282" text-anchor="middle">£300</text><text x="78" y="268.0" text-anchor="end">0</text><text x="78" y="188.0" text-anchor="end">20,000</text><text x="78" y="108.0" text-anchor="end">40,000</text><text x="78" y="28.0" text-anchor="end">60,000</text><text x="391.0" y="306" text-anchor="middle">candidate centre for A, B, C (£ spend)</text><text x="16" y="144.0" transform="rotate(-90 16 144.0)" text-anchor="middle">sum of squared gaps</text></g><path d="M86.0 24.0 L96.2 24.0 L106.3 24.0 L116.5 25.3 L126.7 41.2 L136.8 56.5 L147.0 71.2 L157.2 85.3 L167.3 98.8 L177.5 111.7 L187.7 124.0 L197.8 135.7 L208.0 146.8 L218.2 157.3 L228.3 167.2 L238.5 176.5 L248.7 185.2 L258.8 193.3 L269.0 200.8 L279.2 207.7 L289.3 214.0 L299.5 219.7 L309.7 224.8 L319.8 229.3 L330.0 233.2 L340.2 236.5 L350.3 239.2 L360.5 241.3 L370.7 242.8 L380.8 243.7 L391.0 244.0 L401.2 243.7 L411.3 242.8 L421.5 241.3 L431.7 239.2 L441.8 236.5 L452.0 233.2 L462.2 229.3 L472.3 224.8 L482.5 219.7 L492.7 214.0 L502.8 207.7 L513.0 200.8 L523.2 193.3 L533.3 185.2 L543.5 176.5 L553.7 167.2 L563.8 157.3 L574.0 146.8 L584.2 135.7 L594.3 124.0 L604.5 111.7 L614.7 98.8 L624.8 85.3 L635.0 71.2 L645.2 56.5 L655.3 41.2 L665.5 25.3 L675.7 24.0 L685.8 24.0 L696.0 24.0" fill="none" stroke="#111111" stroke-width="3"/><line x1="289.3" y1="264.0" x2="289.3" y2="254.0" stroke="#135d77" stroke-width="3"/><line x1="391.0" y1="264.0" x2="391.0" y2="254.0" stroke="#135d77" stroke-width="3"/><line x1="492.7" y1="264.0" x2="492.7" y2="254.0" stroke="#135d77" stroke-width="3"/><circle cx="289.3" cy="214.0" r="7" fill="#fff" stroke="#111111" stroke-width="1.6"/><text x="301.3" y="204.0" fill="#a54e2c" font-family="DM Mono, ui-monospace, monospace" font-size="12">centre on A: 12,500</text><circle cx="391.0" cy="244.0" r="7" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="403.0" y="268.0" fill="#a54e2c" font-family="DM Mono, ui-monospace, monospace" font-size="12">centre at the mean: 5,000</text></svg></div>
+              <figcaption>Putting the centre on customer A gives a total of 12,500. Moving it to the mean (£150) gives 5,000, the bottom of the curve. This is why every Update can only lower inertia.</figcaption>
+            </figure>
+            <div class="bridge"><strong>What the maths guarantees, and what it does not.</strong> Each step lowers or keeps inertia, so the loop always settles. But it settles on the best answer <em>reachable from where it started</em>, which may not be the best answer overall. Finding the true best grouping is a very hard problem in general, which is why the starting positions in Section 07 matter.</div>
+          </div>
+        </section>
+
+        <section id="choose-k" class="section">
+          <div class="section-index"><b>06</b><span>Choosing<br>K</span></div>
+          <div class="section-main">
+            <h2>Choosing K: two charts and your judgement</h2>
+            <p class="intro">K-Means cannot tell you how many groups there are. The usual approach is to run it for several values of K and compare. Here is that comparison for customers A–I, with each K given its best result.</p>
+            <div class="table-panel"><table aria-label="Inertia and silhouette for each K"><thead><tr><th>K</th><th>Inertia</th><th>Mean silhouette</th></tr></thead><tbody><tr><td>1</td><td>18.000</td><td>—</td></tr><tr><td>2</td><td>8.698</td><td>0.554</td></tr><tr><td>3</td><td>0.190</td><td>0.897</td></tr><tr><td>4</td><td>0.140</td><td>0.671</td></tr><tr><td>5</td><td>0.094</td><td>0.424</td></tr><tr><td>6</td><td>0.052</td><td>0.202</td></tr></tbody></table></div>
+
+            <h3 class="step-title">The elbow method</h3>
+            <p>Inertia always falls as K rises: with more centres every row can sit closer to one. At K = 9 every row would have its own centre and inertia would be zero. So "lowest inertia" is useless on its own. Instead, look for the point where adding another group stops buying much improvement: the <strong>elbow</strong>.</p>
+            <div class="split">
+              <article class="panel"><h3>Elbow chart <small>inertia vs K</small></h3><svg viewBox="0 0 560 320" role="img" aria-labelledby="elb-t elb-d"><title id="elb-t">Elbow chart for customers A to I</title><desc id="elb-d">Inertia for K from 1 to 6: K=1 18.00, K=2 8.70, K=3 0.19, K=4 0.14, K=5 0.09, K=6 0.05. The drop is steep until K=3 and almost flat after it.</desc><rect width="560" height="320" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="97.8" y1="24" x2="97.8" y2="264"/><line x1="177.5" y1="24" x2="177.5" y2="264"/><line x1="257.2" y1="24" x2="257.2" y2="264"/><line x1="336.8" y1="24" x2="336.8" y2="264"/><line x1="416.5" y1="24" x2="416.5" y2="264"/><line x1="496.2" y1="24" x2="496.2" y2="264"/><line x1="58" y1="264.0" x2="536" y2="264.0"/><line x1="58" y1="204.0" x2="536" y2="204.0"/><line x1="58" y1="144.0" x2="536" y2="144.0"/><line x1="58" y1="84.0" x2="536" y2="84.0"/><line x1="58" y1="24.0" x2="536" y2="24.0"/></g><line x1="58" y1="264" x2="536" y2="264" stroke="#111111" stroke-width="1.5"/><line x1="58" y1="264" x2="58" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="97.8" y="282" text-anchor="middle">1</text><text x="177.5" y="282" text-anchor="middle">2</text><text x="257.2" y="282" text-anchor="middle">3</text><text x="336.8" y="282" text-anchor="middle">4</text><text x="416.5" y="282" text-anchor="middle">5</text><text x="496.2" y="282" text-anchor="middle">6</text><text x="50" y="268.0" text-anchor="end">0</text><text x="50" y="208.0" text-anchor="end">5</text><text x="50" y="148.0" text-anchor="end">10</text><text x="50" y="88.0" text-anchor="end">15</text><text x="50" y="28.0" text-anchor="end">20</text><text x="297.0" y="306" text-anchor="middle">K (number of groups)</text><text x="16" y="144.0" transform="rotate(-90 16 144.0)" text-anchor="middle">inertia</text></g><polyline points="97.8,48.0 177.5,159.6 257.2,261.7 336.8,262.3 416.5,262.9 496.2,263.4" fill="none" stroke="#111111" stroke-width="3"/><circle cx="97.8" cy="48.0" r="5" fill="#111111" stroke="#111111"/><text x="105.8" y="38.0" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">18.00</text><circle cx="177.5" cy="159.6" r="5" fill="#111111" stroke="#111111"/><text x="185.5" y="149.6" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">8.70</text><circle cx="257.2" cy="261.7" r="8" fill="#d9ff38" stroke="#111111"/><text x="265.2" y="251.7" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.19</text><circle cx="336.8" cy="262.3" r="5" fill="#111111" stroke="#111111"/><text x="344.8" y="252.3" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.14</text><circle cx="416.5" cy="262.9" r="5" fill="#111111" stroke="#111111"/><text x="424.5" y="252.9" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.09</text><circle cx="496.2" cy="263.4" r="5" fill="#111111" stroke="#111111"/><text x="504.2" y="253.4" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.05</text><text x="271.2" y="233.7" fill="#a54e2c" font-family="DM Mono, ui-monospace, monospace" font-size="12">elbow at K = 3</text></svg><p>From K=2 to K=3 inertia drops from 8.698 to 0.190. After that the line is almost flat. The elbow is at 3.</p></article>
+              <article class="panel"><h3>Silhouette chart <small>mean score vs K</small></h3><svg viewBox="0 0 560 320" role="img" aria-labelledby="silk-t silk-d"><title id="silk-t">Mean silhouette score for each K</title><desc id="silk-d">Mean silhouette for K from 2 to 6: K=2 0.55, K=3 0.90, K=4 0.67, K=5 0.42, K=6 0.20. K=3 is highest.</desc><rect width="560" height="320" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="105.8" y1="24" x2="105.8" y2="264"/><line x1="201.4" y1="24" x2="201.4" y2="264"/><line x1="297.0" y1="24" x2="297.0" y2="264"/><line x1="392.6" y1="24" x2="392.6" y2="264"/><line x1="488.2" y1="24" x2="488.2" y2="264"/><line x1="58" y1="264.0" x2="536" y2="264.0"/><line x1="58" y1="204.0" x2="536" y2="204.0"/><line x1="58" y1="144.0" x2="536" y2="144.0"/><line x1="58" y1="84.0" x2="536" y2="84.0"/><line x1="58" y1="24.0" x2="536" y2="24.0"/></g><line x1="58" y1="264" x2="536" y2="264" stroke="#111111" stroke-width="1.5"/><line x1="58" y1="264" x2="58" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="105.8" y="282" text-anchor="middle">2</text><text x="201.4" y="282" text-anchor="middle">3</text><text x="297.0" y="282" text-anchor="middle">4</text><text x="392.6" y="282" text-anchor="middle">5</text><text x="488.2" y="282" text-anchor="middle">6</text><text x="50" y="268.0" text-anchor="end">0.00</text><text x="50" y="208.0" text-anchor="end">0.25</text><text x="50" y="148.0" text-anchor="end">0.50</text><text x="50" y="88.0" text-anchor="end">0.75</text><text x="50" y="28.0" text-anchor="end">1.00</text><text x="297.0" y="306" text-anchor="middle">K (number of groups)</text><text x="16" y="144.0" transform="rotate(-90 16 144.0)" text-anchor="middle">mean silhouette</text></g><rect x="83.8" y="131.1" width="44" height="132.9" fill="#135d77" stroke="#111111"/><text x="105.8" y="123.1" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.55</text><rect x="179.4" y="48.6" width="44" height="215.4" fill="#d9ff38" stroke="#111111"/><text x="201.4" y="40.6" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.90</text><rect x="275.0" y="102.9" width="44" height="161.1" fill="#135d77" stroke="#111111"/><text x="297.0" y="94.9" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.67</text><rect x="370.6" y="162.2" width="44" height="101.8" fill="#135d77" stroke="#111111"/><text x="392.6" y="154.2" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.42</text><rect x="466.2" y="215.6" width="44" height="48.4" fill="#135d77" stroke="#111111"/><text x="488.2" y="207.6" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.20</text></svg><p>The mean silhouette score (explained below) is highest at K=3, agreeing with the elbow.</p></article>
+            </div>
+            <div class="note">Real data is rarely this tidy. Often the elbow curve bends gently with no clear corner, and the two charts may disagree. scikit-learn's own <a href="https://scikit-learn.org/stable/auto_examples/cluster/plot_kmeans_silhouette_analysis.html">silhouette example</a> ends up with more than one reasonable K. When that happens, choose using what the groups will be used for.</div>
+
+            <h3 class="step-title">The silhouette value, built up from one customer</h3>
+            <p>Each row gets its own silhouette value between −1 and +1. It compares two averages (<a href="https://doi.org/10.1016/0377-0427(87)90125-7">Rousseeuw, 1987</a>):</p>
+            <div class="calc"><b>a</b> = average distance from the row to the other rows in its own group &nbsp;(small is good)<br><b>b</b> = average distance from the row to the rows in the nearest other group &nbsp;(large is good)<br>silhouette = (b − a) ÷ the larger of a and b</div>
+            <p>Take the K = 2 result, where the groups are ABC / DEFGHI. Customer D shares its group with E and F, but also with G, H and I, which sit far away:</p>
+            <figure>
+              <div class="plot"><svg viewBox="0 0 720 460" role="img" aria-labelledby="ab-t ab-d"><title id="ab-t">How the silhouette value for customer D is built</title><desc id="ab-d">With K=2, D shares a group with E, F, G, H and I. Solid lines join D to its own group, average length a = 1.46. Dashed lines join D to A, B and C, average length b = 2.34.</desc><rect width="720" height="460" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="72.0" y1="24" x2="72.0" y2="398"/><line x1="228.0" y1="24" x2="228.0" y2="398"/><line x1="384.0" y1="24" x2="384.0" y2="398"/><line x1="540.0" y1="24" x2="540.0" y2="398"/><line x1="696.0" y1="24" x2="696.0" y2="398"/><line x1="72" y1="398.0" x2="696" y2="398.0"/><line x1="72" y1="303.8" x2="696" y2="303.8"/><line x1="72" y1="209.7" x2="696" y2="209.7"/><line x1="72" y1="115.5" x2="696" y2="115.5"/></g><line x1="72" y1="398" x2="696" y2="398" stroke="#111111" stroke-width="1.5"/><line x1="72" y1="398" x2="72" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="72.0" y="416" text-anchor="middle">£0</text><text x="228.0" y="416" text-anchor="middle">£300</text><text x="384.0" y="416" text-anchor="middle">£600</text><text x="540.0" y="416" text-anchor="middle">£900</text><text x="696.0" y="416" text-anchor="middle">£1,200</text><text x="64" y="402.0" text-anchor="end">0</text><text x="64" y="307.8" text-anchor="end">20</text><text x="64" y="213.7" text-anchor="end">40</text><text x="64" y="119.5" text-anchor="end">60</text><text x="384.0" y="446" text-anchor="middle">annual spend (£)</text><text x="16" y="211.0" transform="rotate(-90 16 211.0)" text-anchor="middle">visits per year</text></g><circle cx="124.0" cy="350.9" r="7" fill="#111111"/><text x="134.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">A</text><circle cx="150.0" cy="341.5" r="7" fill="#111111"/><text x="160.0" y="333.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">B</text><circle cx="176.0" cy="360.3" r="7" fill="#111111"/><text x="186.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">C</text><rect x="377.0" y="132.1" width="14" height="14" fill="#135d77"/><text x="394.0" y="131.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">D</text><rect x="403.0" y="108.5" width="14" height="14" fill="#135d77"/><text x="420.0" y="107.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">E</text><rect x="366.6" y="99.1" width="14" height="14" fill="#135d77"/><text x="383.6" y="98.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">F</text><rect x="585.0" y="343.9" width="14" height="14" fill="#135d77"/><text x="602.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">G</text><rect x="611.0" y="329.8" width="14" height="14" fill="#135d77"/><text x="628.0" y="328.8" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">H</text><rect x="559.0" y="353.3" width="14" height="14" fill="#135d77"/><text x="576.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">I</text><line x1="384.0" y1="139.1" x2="410.0" y2="115.5" stroke="#135d77" stroke-width="1.6"/><line x1="384.0" y1="139.1" x2="373.6" y2="106.1" stroke="#135d77" stroke-width="1.6"/><line x1="384.0" y1="139.1" x2="592.0" y2="350.9" stroke="#135d77" stroke-width="1.6"/><line x1="384.0" y1="139.1" x2="618.0" y2="336.8" stroke="#135d77" stroke-width="1.6"/><line x1="384.0" y1="139.1" x2="566.0" y2="360.3" stroke="#135d77" stroke-width="1.6"/><line x1="384.0" y1="139.1" x2="124.0" y2="350.9" stroke="#a54e2c" stroke-width="1.6" stroke-dasharray="6 4"/><line x1="384.0" y1="139.1" x2="150.0" y2="341.5" stroke="#a54e2c" stroke-width="1.6" stroke-dasharray="6 4"/><line x1="384.0" y1="139.1" x2="176.0" y2="360.3" stroke="#a54e2c" stroke-width="1.6" stroke-dasharray="6 4"/><g font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="90" y="44" fill="#135d77">solid lines: a = mean distance to own group = 1.46</text><text x="90" y="62" fill="#a54e2c">dashed lines: b = mean distance to other group = 2.34</text></g></svg></div>
+              <figcaption>For D: a = 1.46, b = 2.34, so silhouette = (2.34 − 1.46) ÷ 2.34 = 0.37. Positive, but weak: D is only a lukewarm member of its group.</figcaption>
+            </figure>
+            <div class="calc">near +1 &nbsp;→ the row is much closer to its own group than to any other<br>near 0 &nbsp;&nbsp;→ the row sits on a boundary between two groups<br>below 0 &nbsp;→ the row is closer to another group than to its own: probably misplaced</div>
+            <p>Plot every row's value as a bar, grouped by cluster, and you get a silhouette chart. Compare K = 2 with K = 3:</p>
+            <div class="split">
+              <article class="panel"><h3>K = 2 <small>mean 0.55</small></h3><svg viewBox="0 0 560 330" role="img" aria-labelledby="sil2-t sil2-d"><title id="sil2-t">Silhouette bars with K = 2</title><desc id="sil2-d">Silhouette value for each customer: A 0.91; B 0.92; C 0.89; D 0.37; E 0.41; F 0.36; G 0.38; H 0.41; I 0.32</desc><rect width="560" height="330" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="137.7" y1="14" x2="137.7" y2="284"/><line x1="336.8" y1="14" x2="336.8" y2="284"/><line x1="536.0" y1="14" x2="536.0" y2="284"/></g><line x1="58" y1="284" x2="536" y2="284" stroke="#111111" stroke-width="1.5"/><line x1="58" y1="284" x2="58" y2="14" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="137.7" y="302" text-anchor="middle">0.0</text><text x="336.8" y="302" text-anchor="middle">0.5</text><text x="536.0" y="302" text-anchor="middle">1.0</text><text x="297.0" y="316" text-anchor="middle">silhouette value per customer</text><text x="16" y="149.0" transform="rotate(-90 16 149.0)" text-anchor="middle"></text></g><line x1="137.7" y1="14" x2="137.7" y2="284.0" stroke="#111111"/><rect x="137.7" y="29.5" width="366.2" height="16" fill="#111111"/><text x="131.7" y="41.5" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">B</text><text x="509.9" y="41.5" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.92</text><rect x="137.7" y="54.1" width="362.3" height="16" fill="#111111"/><text x="131.7" y="66.1" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">A</text><text x="506.0" y="66.1" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.91</text><rect x="137.7" y="78.6" width="354.8" height="16" fill="#111111"/><text x="131.7" y="90.6" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">C</text><text x="498.5" y="90.6" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.89</text><rect x="137.7" y="115.5" width="165.1" height="16" fill="#135d77"/><text x="131.7" y="127.5" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">E</text><text x="308.7" y="127.5" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.41</text><rect x="137.7" y="140.0" width="163.1" height="16" fill="#135d77"/><text x="131.7" y="152.0" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">H</text><text x="306.7" y="152.0" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.41</text><rect x="137.7" y="164.5" width="151.2" height="16" fill="#135d77"/><text x="131.7" y="176.5" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">G</text><text x="294.9" y="176.5" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.38</text><rect x="137.7" y="189.1" width="148.9" height="16" fill="#135d77"/><text x="131.7" y="201.1" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">D</text><text x="292.5" y="201.1" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.37</text><rect x="137.7" y="213.6" width="145.3" height="16" fill="#135d77"/><text x="131.7" y="225.6" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">F</text><text x="289.0" y="225.6" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.36</text><rect x="137.7" y="238.2" width="128.6" height="16" fill="#135d77"/><text x="131.7" y="250.2" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">I</text><text x="272.3" y="250.2" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.32</text></svg><p>The D–I group has short bars: its members are loosely held. Short or negative bars point at a group that is really two groups, or at rows that sit between groups.</p></article>
+              <article class="panel"><h3>K = 3 <small>mean 0.90</small></h3><svg viewBox="0 0 560 330" role="img" aria-labelledby="sil3-t sil3-d"><title id="sil3-t">Silhouette bars with K = 3</title><desc id="sil3-d">Silhouette value for each customer: A 0.91; B 0.92; C 0.89; D 0.87; E 0.90; F 0.90; G 0.92; H 0.88; I 0.89</desc><rect width="560" height="330" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="137.7" y1="14" x2="137.7" y2="284"/><line x1="336.8" y1="14" x2="336.8" y2="284"/><line x1="536.0" y1="14" x2="536.0" y2="284"/></g><line x1="58" y1="284" x2="536" y2="284" stroke="#111111" stroke-width="1.5"/><line x1="58" y1="284" x2="58" y2="14" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="137.7" y="302" text-anchor="middle">0.0</text><text x="336.8" y="302" text-anchor="middle">0.5</text><text x="536.0" y="302" text-anchor="middle">1.0</text><text x="297.0" y="316" text-anchor="middle">silhouette value per customer</text><text x="16" y="149.0" transform="rotate(-90 16 149.0)" text-anchor="middle"></text></g><line x1="137.7" y1="14" x2="137.7" y2="284.0" stroke="#111111"/><rect x="137.7" y="29.5" width="366.1" height="16" fill="#111111"/><text x="131.7" y="41.5" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">B</text><text x="509.8" y="41.5" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.92</text><rect x="137.7" y="54.1" width="362.3" height="16" fill="#111111"/><text x="131.7" y="66.1" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">A</text><text x="505.9" y="66.1" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.91</text><rect x="137.7" y="78.6" width="352.9" height="16" fill="#111111"/><text x="131.7" y="90.6" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">C</text><text x="496.5" y="90.6" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.89</text><rect x="137.7" y="115.5" width="358.3" height="16" fill="#135d77"/><text x="131.7" y="127.5" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">E</text><text x="501.9" y="127.5" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.90</text><rect x="137.7" y="140.0" width="357.1" height="16" fill="#135d77"/><text x="131.7" y="152.0" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">F</text><text x="500.8" y="152.0" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.90</text><rect x="137.7" y="164.5" width="348.1" height="16" fill="#135d77"/><text x="131.7" y="176.5" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">D</text><text x="491.8" y="176.5" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.87</text><rect x="137.7" y="201.4" width="368.4" height="16" fill="#a54e2c"/><text x="131.7" y="213.4" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">G</text><text x="512.1" y="213.4" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.92</text><rect x="137.7" y="225.9" width="352.6" height="16" fill="#a54e2c"/><text x="131.7" y="237.9" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">I</text><text x="496.3" y="237.9" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.89</text><rect x="137.7" y="250.5" width="351.7" height="16" fill="#a54e2c"/><text x="131.7" y="262.5" text-anchor="end" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="11">H</text><text x="495.4" y="262.5" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0.88</text></svg><p>Every bar is long and every group looks similar. This is what a clear, well-separated grouping looks like.</p></article>
+            </div>
+            <div class="note signal"><strong>Read the bars, not only the mean.</strong> One average can hide a group of poorly placed rows. In Python, <code>silhouette_score</code> gives the mean and <code>silhouette_samples</code> gives the value for every row (<a href="https://scikit-learn.org/stable/modules/generated/sklearn.metrics.silhouette_score.html">scikit-learn reference</a>).</div>
+          </div>
+        </section>
+
+        <section id="starts" class="section">
+          <div class="section-index"><b>07</b><span>Starting<br>positions</span></div>
+          <div class="section-main">
+            <h2>Where the centres start changes where they finish</h2>
+            <p class="intro">Because the loop only ever goes downhill, a bad start can trap it. In the stepper in Section 04, starting on A, C, G puts two centres inside the A–C clump and only one centre for everything else.</p>
+            <figure>
+              <div class="plot"><svg viewBox="0 0 720 460" role="img" aria-labelledby="stuck-t stuck-d"><title id="stuck-t">A poor start that never recovers</title><desc id="stuck-d">Starting from rows A, C, G, K-Means settles on groups AB / C / DEFGHI with inertia 8.66, far worse than 0.190.</desc><rect width="720" height="460" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="72.0" y1="24" x2="72.0" y2="398"/><line x1="228.0" y1="24" x2="228.0" y2="398"/><line x1="384.0" y1="24" x2="384.0" y2="398"/><line x1="540.0" y1="24" x2="540.0" y2="398"/><line x1="696.0" y1="24" x2="696.0" y2="398"/><line x1="72" y1="398.0" x2="696" y2="398.0"/><line x1="72" y1="303.8" x2="696" y2="303.8"/><line x1="72" y1="209.7" x2="696" y2="209.7"/><line x1="72" y1="115.5" x2="696" y2="115.5"/></g><line x1="72" y1="398" x2="696" y2="398" stroke="#111111" stroke-width="1.5"/><line x1="72" y1="398" x2="72" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="72.0" y="416" text-anchor="middle">£0</text><text x="228.0" y="416" text-anchor="middle">£300</text><text x="384.0" y="416" text-anchor="middle">£600</text><text x="540.0" y="416" text-anchor="middle">£900</text><text x="696.0" y="416" text-anchor="middle">£1,200</text><text x="64" y="402.0" text-anchor="end">0</text><text x="64" y="307.8" text-anchor="end">20</text><text x="64" y="213.7" text-anchor="end">40</text><text x="64" y="119.5" text-anchor="end">60</text><text x="384.0" y="446" text-anchor="middle">annual spend (£)</text><text x="16" y="211.0" transform="rotate(-90 16 211.0)" text-anchor="middle">visits per year</text></g><circle cx="124.0" cy="350.9" r="7" fill="#111111"/><text x="134.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">A</text><circle cx="150.0" cy="341.5" r="7" fill="#111111"/><text x="160.0" y="333.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">B</text><rect x="169.0" y="353.3" width="14" height="14" fill="#135d77"/><text x="186.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">C</text><path d="M384.0 130.6 L392.5 139.1 L384.0 147.6 L375.5 139.1z" fill="#a54e2c"/><text x="394.0" y="131.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">D</text><path d="M410.0 107.0 L418.5 115.5 L410.0 124.0 L401.5 115.5z" fill="#a54e2c"/><text x="420.0" y="107.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">E</text><path d="M373.6 97.6 L382.1 106.1 L373.6 114.6 L365.1 106.1z" fill="#a54e2c"/><text x="383.6" y="98.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">F</text><path d="M592.0 342.4 L600.5 350.9 L592.0 359.4 L583.5 350.9z" fill="#a54e2c"/><text x="602.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">G</text><path d="M618.0 328.3 L626.5 336.8 L618.0 345.3 L609.5 336.8z" fill="#a54e2c"/><text x="628.0" y="328.8" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">H</text><path d="M566.0 351.8 L574.5 360.3 L566.0 368.8 L557.5 360.3z" fill="#a54e2c"/><text x="576.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">I</text><path d="M137.0 335.2 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="137.0" y="370.2" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">centre 0</text><path d="M176.0 349.3 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="176.0" y="384.3" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">centre 1</text><path d="M490.6 223.8 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="490.6" y="258.8" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">centre 2</text></svg></div>
+              <figcaption>The stuck run finishes with groups AB / C / DEFGHI and inertia 8.66, more than forty times worse than the 0.190 found from a good start. Nothing in the loop can pull a centre out of A–C, so it never improves.</figcaption>
+            </figure>
+            <h3 class="step-title">Fix 1: start the centres far apart (k-means++)</h3>
+            <p>k-means++ chooses the first centre at random, then picks each further centre with a probability proportional to its squared distance from the nearest centre already chosen (<a href="http://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf">Arthur &amp; Vassilvitskii, 2007</a>). Rows far away become likely picks; rows close by become unlikely. Suppose A is chosen first:</p>
+            <figure>
+              <div class="plot"><svg viewBox="0 0 720 300" role="img" aria-labelledby="pp-t pp-d"><title id="pp-t">k-means++: chance of each row becoming the second centre</title><desc id="pp-d">With A already chosen as the first centre, each row's chance is its squared distance from A divided by the total: A 0%, B 0%, C 0%, D 15%, E 18%, F 17%, G 17%, H 19%, I 15%.</desc><rect width="720" height="300" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="58" y1="248.0" x2="696" y2="248.0"/><line x1="58" y1="142.8" x2="696" y2="142.8"/><line x1="58" y1="37.6" x2="696" y2="37.6"/></g><line x1="58" y1="248" x2="696" y2="248" stroke="#111111" stroke-width="1.5"/><line x1="58" y1="248" x2="58" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="50" y="252.0" text-anchor="end">0%</text><text x="50" y="146.8" text-anchor="end">10%</text><text x="50" y="41.6" text-anchor="end">20%</text><text x="377.0" y="286" text-anchor="middle">customer</text><text x="16" y="136.0" transform="rotate(-90 16 136.0)" text-anchor="middle">chance of being picked next</text></g><rect x="71.4" y="248.0" width="44" height="0.0" fill="#111111"/><text x="93.4" y="266.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">A</text><text x="93.4" y="242.0" text-anchor="middle" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0%</text><rect x="142.3" y="247.3" width="44" height="0.7" fill="#111111"/><text x="164.3" y="266.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">B</text><text x="164.3" y="241.3" text-anchor="middle" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0%</text><rect x="213.2" y="245.7" width="44" height="2.3" fill="#111111"/><text x="235.2" y="266.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">C</text><text x="235.2" y="239.7" text-anchor="middle" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">0%</text><rect x="284.1" y="94.7" width="44" height="153.3" fill="#135d77"/><text x="306.1" y="266.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">D</text><text x="306.1" y="88.7" text-anchor="middle" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">15%</text><rect x="355.0" y="60.0" width="44" height="188.0" fill="#135d77"/><text x="377.0" y="266.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">E</text><text x="377.0" y="54.0" text-anchor="middle" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">18%</text><rect x="425.9" y="65.5" width="44" height="182.5" fill="#135d77"/><text x="447.9" y="266.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">F</text><text x="447.9" y="59.5" text-anchor="middle" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">17%</text><rect x="496.8" y="73.6" width="44" height="174.4" fill="#a54e2c"/><text x="518.8" y="266.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">G</text><text x="518.8" y="67.6" text-anchor="middle" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">17%</text><rect x="567.7" y="53.2" width="44" height="194.8" fill="#a54e2c"/><text x="589.7" y="266.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">H</text><text x="589.7" y="47.2" text-anchor="middle" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">19%</text><rect x="638.6" y="92.2" width="44" height="155.8" fill="#a54e2c"/><text x="660.6" y="266.0" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">I</text><text x="660.6" y="86.2" text-anchor="middle" fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="11">15%</text></svg></div>
+              <figcaption>The chance that the second centre lands back in A's own clump (A, B or C) is only 0.3%. The chance it lands in another clump is 99.7%. The trap shown above becomes very unlikely.</figcaption>
+            </figure>
+            <h3 class="step-title">Fix 2: run it several times and keep the best</h3>
+            <p>Run K-Means from several different starts and keep the run with the lowest inertia. In scikit-learn this is the <code>n_init</code> setting. The default is <code>init="k-means++"</code> with <code>n_init="auto"</code>, which currently means <strong>one</strong> run when k-means++ is used (<a href="https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html">KMeans reference</a>). On messy real data it is worth asking for more, for example <code>n_init=10</code>.</p>
+            <div class="note"><strong>Also set <code>random_state</code></strong> to a fixed number. Then you, and anyone checking your work, get the same groups every time the notebook runs.</div>
+          </div>
+        </section>
+
+        <section id="limits" class="section">
+          <div class="section-index"><b>08</b><span>Where it<br>goes<br>wrong</span></div>
+          <div class="section-main">
+            <h2>Four ways K-Means can mislead you</h2>
+            <p class="intro">K-Means has a built-in picture of what a group is: a compact, roughly round blob around one centre, with every row forced into exactly one group. When the data does not look like that, it still returns an answer, and the answer can look perfectly tidy (<a href="https://scikit-learn.org/stable/auto_examples/cluster/plot_kmeans_assumptions.html">scikit-learn: demonstration of K-Means assumptions</a>).</p>
+            <div class="split">
+              <article class="panel"><h3>1. No real groups <small>noise</small></h3><svg viewBox="0 0 360 300" role="img" aria-labelledby="noise-t noise-d"><title id="noise-t">Random noise still gets three groups</title><desc id="noise-d">Ninety points scattered uniformly at random, with no real groups. K-Means with K=3 still divides the square into three regions. Mean silhouette 0.42.</desc><rect width="360" height="300" fill="#fff"/><rect x="20" y="14" width="326" height="266" fill="none" stroke="#111111"/><circle cx="125.6" cy="239.9" r="4" fill="#111111"/><rect x="228.2" y="256.7" width="8" height="8" fill="#135d77"/><rect x="190.7" y="178.7" width="8" height="8" fill="#135d77"/><circle cx="38.9" cy="145.0" r="4" fill="#111111"/><circle cx="32.2" cy="164.7" r="4" fill="#111111"/><circle cx="42.8" cy="255.9" r="4" fill="#111111"/><path d="M158.4 54.6 L163.9 60.1 L158.4 65.6 L152.9 60.1z" fill="#a54e2c"/><circle cx="60.4" cy="220.6" r="4" fill="#111111"/><path d="M224.5 22.4 L230.0 27.9 L224.5 33.4 L219.0 27.9z" fill="#a54e2c"/><rect x="204.1" y="170.5" width="8" height="8" fill="#135d77"/><rect x="334.3" y="263.6" width="8" height="8" fill="#135d77"/><rect x="295.9" y="199.0" width="8" height="8" fill="#135d77"/><circle cx="67.0" cy="248.7" r="4" fill="#111111"/><path d="M120.6 57.4 L126.1 62.9 L120.6 68.4 L115.1 62.9z" fill="#a54e2c"/><circle cx="78.9" cy="125.3" r="4" fill="#111111"/><rect x="224.3" y="176.9" width="8" height="8" fill="#135d77"/><rect x="194.6" y="259.3" width="8" height="8" fill="#135d77"/><circle cx="39.4" cy="225.2" r="4" fill="#111111"/><rect x="237.8" y="162.3" width="8" height="8" fill="#135d77"/><circle cx="122.4" cy="124.2" r="4" fill="#111111"/><rect x="163.7" y="196.3" width="8" height="8" fill="#135d77"/><path d="M279.0 88.6 L284.5 94.1 L279.0 99.6 L273.5 94.1z" fill="#a54e2c"/><circle cx="99.6" cy="127.2" r="4" fill="#111111"/><path d="M191.2 41.7 L196.7 47.2 L191.2 52.7 L185.7 47.2z" fill="#a54e2c"/><rect x="253.8" y="199.4" width="8" height="8" fill="#135d77"/><rect x="335.5" y="244.6" width="8" height="8" fill="#135d77"/><path d="M156.3 73.1 L161.8 78.6 L156.3 84.1 L150.8 78.6z" fill="#a54e2c"/><circle cx="69.5" cy="149.9" r="4" fill="#111111"/><circle cx="32.8" cy="102.3" r="4" fill="#111111"/><path d="M269.3 122.1 L274.8 127.6 L269.3 133.1 L263.8 127.6z" fill="#a54e2c"/><rect x="301.4" y="192.5" width="8" height="8" fill="#135d77"/><path d="M246.7 116.4 L252.2 121.9 L246.7 127.4 L241.2 121.9z" fill="#a54e2c"/><rect x="205.0" y="154.6" width="8" height="8" fill="#135d77"/><path d="M293.8 23.2 L299.3 28.7 L293.8 34.2 L288.3 28.7z" fill="#a54e2c"/><path d="M174.6 97.8 L180.1 103.3 L174.6 108.8 L169.1 103.3z" fill="#a54e2c"/><circle cx="39.8" cy="93.4" r="4" fill="#111111"/><path d="M231.0 10.3 L236.5 15.8 L231.0 21.3 L225.5 15.8z" fill="#a54e2c"/><rect x="283.9" y="200.3" width="8" height="8" fill="#135d77"/><path d="M145.8 96.6 L151.3 102.1 L145.8 107.6 L140.3 102.1z" fill="#a54e2c"/><circle cx="27.4" cy="157.2" r="4" fill="#111111"/><circle cx="74.8" cy="248.9" r="4" fill="#111111"/><circle cx="39.2" cy="75.7" r="4" fill="#111111"/><circle cx="62.2" cy="214.1" r="4" fill="#111111"/><path d="M147.4 42.7 L152.9 48.2 L147.4 53.7 L141.9 48.2z" fill="#a54e2c"/><circle cx="46.3" cy="160.5" r="4" fill="#111111"/><path d="M199.1 39.5 L204.6 45.0 L199.1 50.5 L193.6 45.0z" fill="#a54e2c"/><path d="M287.1 44.7 L292.6 50.2 L287.1 55.7 L281.6 50.2z" fill="#a54e2c"/><circle cx="110.8" cy="169.5" r="4" fill="#111111"/><path d="M137.0 39.3 L142.5 44.8 L137.0 50.3 L131.5 44.8z" fill="#a54e2c"/><rect x="328.2" y="235.9" width="8" height="8" fill="#135d77"/><circle cx="77.4" cy="218.3" r="4" fill="#111111"/><circle cx="96.1" cy="151.0" r="4" fill="#111111"/><rect x="208.1" y="206.1" width="8" height="8" fill="#135d77"/><circle cx="21.3" cy="168.6" r="4" fill="#111111"/><circle cx="140.4" cy="129.4" r="4" fill="#111111"/><path d="M330.7 90.8 L336.2 96.3 L330.7 101.8 L325.2 96.3z" fill="#a54e2c"/><path d="M188.1 110.2 L193.6 115.7 L188.1 121.2 L182.6 115.7z" fill="#a54e2c"/><rect x="236.4" y="261.6" width="8" height="8" fill="#135d77"/><path d="M313.2 67.0 L318.7 72.5 L313.2 78.0 L307.7 72.5z" fill="#a54e2c"/><path d="M305.1 62.3 L310.6 67.8 L305.1 73.3 L299.6 67.8z" fill="#a54e2c"/><circle cx="147.9" cy="173.9" r="4" fill="#111111"/><circle cx="53.8" cy="111.3" r="4" fill="#111111"/><circle cx="40.3" cy="262.1" r="4" fill="#111111"/><circle cx="88.1" cy="236.8" r="4" fill="#111111"/><rect x="126.9" y="262.0" width="8" height="8" fill="#135d77"/><circle cx="20.1" cy="239.8" r="4" fill="#111111"/><circle cx="53.1" cy="183.3" r="4" fill="#111111"/><circle cx="28.3" cy="47.4" r="4" fill="#111111"/><rect x="216.2" y="236.5" width="8" height="8" fill="#135d77"/><circle cx="102.2" cy="187.6" r="4" fill="#111111"/><rect x="134.7" y="243.3" width="8" height="8" fill="#135d77"/><path d="M296.8 10.3 L302.3 15.8 L296.8 21.3 L291.3 15.8z" fill="#a54e2c"/><circle cx="171.9" cy="151.3" r="4" fill="#111111"/><circle cx="48.0" cy="252.8" r="4" fill="#111111"/><circle cx="131.7" cy="209.6" r="4" fill="#111111"/><rect x="286.2" y="233.1" width="8" height="8" fill="#135d77"/><circle cx="27.5" cy="27.0" r="4" fill="#111111"/><rect x="188.2" y="237.0" width="8" height="8" fill="#135d77"/><rect x="193.1" y="268.8" width="8" height="8" fill="#135d77"/><path d="M192.2 14.2 L197.7 19.7 L192.2 25.2 L186.7 19.7z" fill="#a54e2c"/><path d="M301.4 89.3 L306.9 94.8 L301.4 100.3 L295.9 94.8z" fill="#a54e2c"/><circle cx="105.1" cy="182.5" r="4" fill="#111111"/><circle cx="74.5" cy="74.7" r="4" fill="#111111"/><path d="M193.6 67.3 L199.1 72.8 L193.6 78.3 L188.1 72.8z" fill="#a54e2c"/><circle cx="127.5" cy="220.7" r="4" fill="#111111"/><path d="M284.6 12.5 L290.1 18.0 L284.6 23.5 L279.1 18.0z" fill="#a54e2c"/><path d="M298.0 60.1 L303.5 65.6 L298.0 71.1 L292.5 65.6z" fill="#a54e2c"/><path d="M286.8 77.7 L292.3 83.2 L286.8 88.7 L281.3 83.2z" fill="#a54e2c"/><circle cx="93.9" cy="142.3" r="4" fill="#111111"/><rect x="131.9" y="268.3" width="8" height="8" fill="#135d77"/><path d="M73.3 158.7 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><path d="M233.3 214.1 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><path d="M231.6 55.0 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/></svg><p>These 90 points are pure random scatter. K-Means still carves them into three neat regions, because it <em>always</em> returns K groups. The mean silhouette is 0.42, which is not a warning-level number on its own. Always ask whether groups exist before trusting any.</p></article>
+              <article class="panel"><h3>2. Rings and curves <small>shape</small></h3><svg viewBox="0 0 360 300" role="img" aria-labelledby="rings-t rings-d"><title id="rings-t">Two rings cut in half</title><desc id="rings-d">An inner ring and an outer ring. K-Means with K=2 splits the picture down the middle, putting half of each ring in each group, because it can only draw straight boundaries between centres.</desc><rect width="360" height="300" fill="#fff"/><rect x="20" y="14" width="326" height="266" fill="none" stroke="#111111"/><circle cx="225.7" cy="149.3" r="4" fill="#111111"/><circle cx="227.7" cy="136.7" r="4" fill="#111111"/><circle cx="233.6" cy="131.3" r="4" fill="#111111"/><circle cx="228.3" cy="118.4" r="4" fill="#111111"/><circle cx="221.7" cy="118.8" r="4" fill="#111111"/><circle cx="203.8" cy="115.4" r="4" fill="#111111"/><circle cx="194.2" cy="112.2" r="4" fill="#111111"/><circle cx="189.7" cy="103.1" r="4" fill="#111111"/><circle cx="182.3" cy="107.5" r="4" fill="#111111"/><circle cx="169.9" cy="105.9" r="4" fill="#111111"/><circle cx="153.1" cy="110.7" r="4" fill="#111111"/><circle cx="155.6" cy="114.3" r="4" fill="#111111"/><circle cx="146.7" cy="123.8" r="4" fill="#111111"/><rect x="130.1" y="123.7" width="8" height="8" fill="#135d77"/><rect x="129.0" y="131.5" width="8" height="8" fill="#135d77"/><rect x="136.3" y="144.1" width="8" height="8" fill="#135d77"/><rect x="129.9" y="146.5" width="8" height="8" fill="#135d77"/><rect x="137.3" y="162.7" width="8" height="8" fill="#135d77"/><rect x="134.6" y="170.2" width="8" height="8" fill="#135d77"/><rect x="151.6" y="169.4" width="8" height="8" fill="#135d77"/><rect x="149.9" y="174.1" width="8" height="8" fill="#135d77"/><rect x="170.2" y="179.3" width="8" height="8" fill="#135d77"/><rect x="171.9" y="182.2" width="8" height="8" fill="#135d77"/><rect x="179.3" y="187.8" width="8" height="8" fill="#135d77"/><rect x="200.3" y="179.4" width="8" height="8" fill="#135d77"/><rect x="203.8" y="172.9" width="8" height="8" fill="#135d77"/><rect x="210.9" y="168.7" width="8" height="8" fill="#135d77"/><rect x="222.8" y="169.5" width="8" height="8" fill="#135d77"/><circle cx="224.4" cy="165.4" r="4" fill="#111111"/><circle cx="227.4" cy="154.4" r="4" fill="#111111"/><circle cx="316.8" cy="147.9" r="4" fill="#111111"/><circle cx="314.4" cy="131.0" r="4" fill="#111111"/><circle cx="315.0" cy="124.2" r="4" fill="#111111"/><circle cx="314.3" cy="108.2" r="4" fill="#111111"/><circle cx="307.0" cy="97.1" r="4" fill="#111111"/><circle cx="301.6" cy="90.8" r="4" fill="#111111"/><circle cx="294.1" cy="86.5" r="4" fill="#111111"/><circle cx="284.0" cy="75.6" r="4" fill="#111111"/><circle cx="268.1" cy="60.8" r="4" fill="#111111"/><circle cx="259.2" cy="56.9" r="4" fill="#111111"/><circle cx="254.4" cy="49.6" r="4" fill="#111111"/><circle cx="236.4" cy="44.7" r="4" fill="#111111"/><circle cx="226.0" cy="37.7" r="4" fill="#111111"/><circle cx="206.3" cy="37.1" r="4" fill="#111111"/><circle cx="194.0" cy="38.3" r="4" fill="#111111"/><circle cx="186.6" cy="35.2" r="4" fill="#111111"/><circle cx="169.5" cy="33.1" r="4" fill="#111111"/><circle cx="159.9" cy="38.3" r="4" fill="#111111"/><circle cx="142.2" cy="40.7" r="4" fill="#111111"/><circle cx="127.5" cy="42.9" r="4" fill="#111111"/><circle cx="113.9" cy="49.9" r="4" fill="#111111"/><circle cx="102.2" cy="51.9" r="4" fill="#111111"/><circle cx="94.0" cy="60.0" r="4" fill="#111111"/><circle cx="87.0" cy="74.8" r="4" fill="#111111"/><circle cx="73.0" cy="76.6" r="4" fill="#111111"/><rect x="64.9" y="91.0" width="8" height="8" fill="#135d77"/><rect x="49.0" y="98.2" width="8" height="8" fill="#135d77"/><rect x="43.2" y="111.2" width="8" height="8" fill="#135d77"/><rect x="39.5" y="118.0" width="8" height="8" fill="#135d77"/><rect x="46.5" y="127.1" width="8" height="8" fill="#135d77"/><rect x="37.6" y="140.7" width="8" height="8" fill="#135d77"/><rect x="44.9" y="158.5" width="8" height="8" fill="#135d77"/><rect x="50.1" y="161.3" width="8" height="8" fill="#135d77"/><rect x="45.1" y="172.7" width="8" height="8" fill="#135d77"/><rect x="52.6" y="188.6" width="8" height="8" fill="#135d77"/><rect x="66.8" y="195.3" width="8" height="8" fill="#135d77"/><rect x="63.8" y="209.4" width="8" height="8" fill="#135d77"/><rect x="77.5" y="219.5" width="8" height="8" fill="#135d77"/><rect x="83.4" y="228.0" width="8" height="8" fill="#135d77"/><rect x="101.4" y="238.5" width="8" height="8" fill="#135d77"/><rect x="111.2" y="240.4" width="8" height="8" fill="#135d77"/><rect x="117.0" y="246.9" width="8" height="8" fill="#135d77"/><rect x="138.3" y="249.1" width="8" height="8" fill="#135d77"/><rect x="144.9" y="247.1" width="8" height="8" fill="#135d77"/><rect x="168.4" y="249.1" width="8" height="8" fill="#135d77"/><rect x="173.8" y="257.2" width="8" height="8" fill="#135d77"/><rect x="187.3" y="251.1" width="8" height="8" fill="#135d77"/><rect x="204.5" y="256.2" width="8" height="8" fill="#135d77"/><rect x="220.3" y="244.9" width="8" height="8" fill="#135d77"/><rect x="238.8" y="247.6" width="8" height="8" fill="#135d77"/><rect x="242.9" y="235.3" width="8" height="8" fill="#135d77"/><rect x="260.4" y="231.3" width="8" height="8" fill="#135d77"/><rect x="265.3" y="230.7" width="8" height="8" fill="#135d77"/><rect x="283.2" y="218.5" width="8" height="8" fill="#135d77"/><rect x="284.2" y="204.0" width="8" height="8" fill="#135d77"/><circle cx="303.3" cy="199.7" r="4" fill="#111111"/><circle cx="302.7" cy="188.7" r="4" fill="#111111"/><circle cx="307.6" cy="177.7" r="4" fill="#111111"/><circle cx="316.3" cy="171.9" r="4" fill="#111111"/><circle cx="319.9" cy="154.1" r="4" fill="#111111"/><path d="M219.6 87.9 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><path d="M145.4 182.5 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/></svg><p>The obvious answer is "inner ring" and "outer ring". K-Means cannot give it, because the boundary between two centres is always a straight line. Density-based methods such as DBSCAN handle shapes like this.</p></article>
+              <article class="panel"><h3>3. Long, thin groups <small>stretch</small></h3><svg viewBox="0 0 360 300" role="img" aria-labelledby="bands-t bands-d"><title id="bands-t">Two long bands cut across</title><desc id="bands-d">Two long horizontal bands of points. K-Means with K=2 may split left from right rather than top from bottom, because each group must be compact around one centre.</desc><rect width="360" height="300" fill="#fff"/><rect x="20" y="14" width="326" height="266" fill="none" stroke="#111111"/><circle cx="68.9" cy="108.1" r="4" fill="#111111"/><circle cx="68.9" cy="195.5" r="4" fill="#111111"/><circle cx="74.8" cy="104.0" r="4" fill="#111111"/><circle cx="74.8" cy="193.7" r="4" fill="#111111"/><circle cx="80.6" cy="110.7" r="4" fill="#111111"/><circle cx="80.6" cy="195.0" r="4" fill="#111111"/><circle cx="86.5" cy="111.6" r="4" fill="#111111"/><circle cx="86.5" cy="194.3" r="4" fill="#111111"/><circle cx="92.3" cy="107.4" r="4" fill="#111111"/><circle cx="92.3" cy="192.7" r="4" fill="#111111"/><circle cx="98.2" cy="100.3" r="4" fill="#111111"/><circle cx="98.2" cy="192.9" r="4" fill="#111111"/><circle cx="104.0" cy="104.4" r="4" fill="#111111"/><circle cx="104.0" cy="194.7" r="4" fill="#111111"/><circle cx="109.9" cy="106.9" r="4" fill="#111111"/><circle cx="109.9" cy="197.3" r="4" fill="#111111"/><circle cx="115.7" cy="108.4" r="4" fill="#111111"/><circle cx="115.7" cy="197.3" r="4" fill="#111111"/><circle cx="121.6" cy="100.7" r="4" fill="#111111"/><circle cx="121.6" cy="188.7" r="4" fill="#111111"/><circle cx="127.4" cy="109.4" r="4" fill="#111111"/><circle cx="127.4" cy="190.0" r="4" fill="#111111"/><circle cx="133.3" cy="97.5" r="4" fill="#111111"/><circle cx="133.3" cy="195.8" r="4" fill="#111111"/><circle cx="139.1" cy="99.4" r="4" fill="#111111"/><circle cx="139.1" cy="190.6" r="4" fill="#111111"/><circle cx="145.0" cy="104.5" r="4" fill="#111111"/><circle cx="145.0" cy="184.2" r="4" fill="#111111"/><circle cx="150.8" cy="106.1" r="4" fill="#111111"/><circle cx="150.8" cy="189.5" r="4" fill="#111111"/><circle cx="156.7" cy="101.4" r="4" fill="#111111"/><circle cx="156.7" cy="181.9" r="4" fill="#111111"/><circle cx="162.5" cy="107.0" r="4" fill="#111111"/><circle cx="162.5" cy="184.3" r="4" fill="#111111"/><circle cx="168.4" cy="101.1" r="4" fill="#111111"/><circle cx="168.4" cy="187.4" r="4" fill="#111111"/><circle cx="174.2" cy="106.0" r="4" fill="#111111"/><circle cx="174.2" cy="192.0" r="4" fill="#111111"/><circle cx="180.1" cy="111.6" r="4" fill="#111111"/><circle cx="180.1" cy="195.5" r="4" fill="#111111"/><rect x="181.9" y="107.3" width="8" height="8" fill="#135d77"/><rect x="181.9" y="181.7" width="8" height="8" fill="#135d77"/><rect x="187.8" y="104.3" width="8" height="8" fill="#135d77"/><rect x="187.8" y="190.9" width="8" height="8" fill="#135d77"/><rect x="193.6" y="107.1" width="8" height="8" fill="#135d77"/><rect x="193.6" y="180.1" width="8" height="8" fill="#135d77"/><rect x="199.5" y="94.5" width="8" height="8" fill="#135d77"/><rect x="199.5" y="182.8" width="8" height="8" fill="#135d77"/><rect x="205.3" y="103.9" width="8" height="8" fill="#135d77"/><rect x="205.3" y="189.7" width="8" height="8" fill="#135d77"/><rect x="211.2" y="103.7" width="8" height="8" fill="#135d77"/><rect x="211.2" y="186.2" width="8" height="8" fill="#135d77"/><rect x="217.0" y="105.9" width="8" height="8" fill="#135d77"/><rect x="217.0" y="186.4" width="8" height="8" fill="#135d77"/><rect x="222.9" y="104.2" width="8" height="8" fill="#135d77"/><rect x="222.9" y="178.2" width="8" height="8" fill="#135d77"/><rect x="228.7" y="92.9" width="8" height="8" fill="#135d77"/><rect x="228.7" y="184.8" width="8" height="8" fill="#135d77"/><rect x="234.6" y="104.5" width="8" height="8" fill="#135d77"/><rect x="234.6" y="178.1" width="8" height="8" fill="#135d77"/><rect x="240.4" y="103.5" width="8" height="8" fill="#135d77"/><rect x="240.4" y="187.8" width="8" height="8" fill="#135d77"/><rect x="246.3" y="108.4" width="8" height="8" fill="#135d77"/><rect x="246.3" y="187.4" width="8" height="8" fill="#135d77"/><rect x="252.1" y="100.8" width="8" height="8" fill="#135d77"/><rect x="252.1" y="185.5" width="8" height="8" fill="#135d77"/><rect x="258.0" y="105.2" width="8" height="8" fill="#135d77"/><rect x="258.0" y="185.5" width="8" height="8" fill="#135d77"/><rect x="263.8" y="108.3" width="8" height="8" fill="#135d77"/><rect x="263.8" y="189.3" width="8" height="8" fill="#135d77"/><rect x="269.7" y="107.0" width="8" height="8" fill="#135d77"/><rect x="269.7" y="187.2" width="8" height="8" fill="#135d77"/><rect x="275.5" y="107.8" width="8" height="8" fill="#135d77"/><rect x="275.5" y="193.2" width="8" height="8" fill="#135d77"/><rect x="281.4" y="103.6" width="8" height="8" fill="#135d77"/><rect x="281.4" y="189.8" width="8" height="8" fill="#135d77"/><rect x="287.2" y="99.1" width="8" height="8" fill="#135d77"/><rect x="287.2" y="185.1" width="8" height="8" fill="#135d77"/><rect x="293.1" y="96.4" width="8" height="8" fill="#135d77"/><rect x="293.1" y="183.0" width="8" height="8" fill="#135d77"/><path d="M124.5 137.5 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><path d="M241.5 137.5 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/></svg><p>Two long bands of points. A single centre in the middle of a long band is far from its ends, so here K-Means cuts across the bands instead of separating them. Gaussian mixture models allow stretched, oval groups.</p></article>
+              <article class="panel"><h3>4. One extreme row <small>outlier</small></h3><svg viewBox="0 0 360 300" role="img" aria-labelledby="outl-t outl-d"><title id="outl-t">One extreme customer takes a whole group</title><desc id="outl-d">Customers A to I plus J, who spends £3,200. With K=3 the groups become ABCGHI / DEF / J: J gets a group of its own and two real groups are merged.</desc><rect width="360" height="300" fill="#fff"/><rect x="20" y="14" width="326" height="266" fill="none" stroke="#111111"/><circle cx="29.6" cy="249.8" r="5" fill="#111111"/><text x="36.6" y="243.8" font-family="DM Mono, ui-monospace, monospace" font-size="10">A</text><circle cx="34.4" cy="243.7" r="5" fill="#111111"/><text x="41.4" y="237.7" font-family="DM Mono, ui-monospace, monospace" font-size="10">B</text><circle cx="39.2" cy="255.8" r="5" fill="#111111"/><text x="46.2" y="249.8" font-family="DM Mono, ui-monospace, monospace" font-size="10">C</text><rect x="72.5" y="108.7" width="10" height="10" fill="#135d77"/><text x="84.5" y="107.7" font-family="DM Mono, ui-monospace, monospace" font-size="10">D</text><rect x="77.3" y="93.6" width="10" height="10" fill="#135d77"/><text x="89.3" y="92.6" font-family="DM Mono, ui-monospace, monospace" font-size="10">E</text><rect x="70.6" y="87.6" width="10" height="10" fill="#135d77"/><text x="82.6" y="86.6" font-family="DM Mono, ui-monospace, monospace" font-size="10">F</text><circle cx="115.9" cy="249.8" r="5" fill="#111111"/><text x="122.9" y="243.8" font-family="DM Mono, ui-monospace, monospace" font-size="10">G</text><circle cx="120.7" cy="240.7" r="5" fill="#111111"/><text x="127.7" y="234.7" font-family="DM Mono, ui-monospace, monospace" font-size="10">H</text><circle cx="111.1" cy="255.8" r="5" fill="#111111"/><text x="118.1" y="249.8" font-family="DM Mono, ui-monospace, monospace" font-size="10">I</text><path d="M326.8 213.0 L333.3 219.5 L326.8 226.0 L320.3 219.5z" fill="#a54e2c"/><text x="333.8" y="213.5" font-family="DM Mono, ui-monospace, monospace" font-size="10">J</text></svg><p>Add customer J, who spends £3,200. With K=3 the groups become ABCGHI / DEF / J: J takes a whole group for itself, so two genuine groups are merged. Check for outliers before clustering and decide how to treat them.</p></article>
+            </div>
+            <div class="bridge"><strong>A fifth problem you cannot draw: many columns.</strong> As the number of columns grows, the distances between all pairs of rows become more and more alike, so "nearest" means less. Google's clustering course calls this the curse of dimensionality and suggests reducing dimensions first, for example with PCA (<a href="https://developers.google.com/machine-learning/clustering/kmeans/advantages-disadvantages">Google, K-Means advantages and disadvantages</a>).</div>
+          </div>
+        </section>
+
+        <section id="when" class="section">
+          <div class="section-index"><b>09</b><span>When to<br>use it</span></div>
+          <div class="section-main">
+            <h2>When K-Means is the right tool</h2>
+            <p class="intro">Sections 03–08 give you everything needed to decide. This section puts it in one place.</p>
+            <div class="split">
+              <article class="panel"><h3>Good fit <small>reach for K-Means</small></h3><ul><li>The columns are <strong>numeric</strong> and averaging them makes sense (spend, counts, measurements).</li><li>You expect groups that are <strong>compact and roughly similar in spread</strong>.</li><li>You want a <strong>fast first look</strong>, or you have a lot of rows. For very large data, scikit-learn's <a href="https://scikit-learn.org/stable/modules/clustering.html#mini-batch-kmeans">MiniBatchKMeans</a> trades a little accuracy for much more speed.</li><li>You have a sensible idea of K, or a range of K to compare.</li><li>You need to place <strong>new rows</strong> into existing groups later: just find the nearest centre.</li></ul></article>
+              <article class="panel"><h3>Poor fit <small>consider something else</small></h3><ul><li>Columns are <strong>categories</strong> such as colour or region. The average of "red" and "blue" means nothing. Use a method built for categorical data.</li><li>Groups are likely to be <strong>curved, ringed or stretched</strong> (Section 08).</li><li>You expect <strong>noise and outliers</strong> that should belong to no group.</li><li>Groups have very <strong>different spreads or densities</strong>.</li><li>You need a <strong>probability</strong> of membership rather than one hard label.</li></ul></article>
+            </div>
+            <div class="table-panel"><table aria-label="Checks before trusting a K-Means result">
+              <thead><tr><th>Before trusting the result, ask</th><th>How to check</th><th>Section</th></tr></thead>
+              <tbody>
+                <tr><td>Are the columns on comparable scales?</td><td>Standardise, or justify why not</td><td>03</td></tr>
+                <tr><td>Is there any group structure at all?</td><td>Scatter plots, silhouette bars; compare with shuffled data</td><td>06, 08</td></tr>
+                <tr><td>Is K justified?</td><td>Elbow and silhouette together, plus what the groups are for</td><td>06</td></tr>
+                <tr><td>Is the result stable?</td><td>Several starts (<code>n_init</code>), a fixed <code>random_state</code>; refit on a sample and compare</td><td>07</td></tr>
+                <tr><td>Did an outlier distort it?</td><td>Look for tiny groups of one or two rows</td><td>08</td></tr>
+                <tr><td>Can each group be described in plain words?</td><td>Profile the groups in the original units</td><td>11</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+        </section>
+
+        <section id="python" class="section">
+          <div class="section-index"><b>10</b><span>K-Means<br>in Python</span></div>
+          <div class="section-main">
+            <h2>The whole route in pandas and scikit-learn</h2>
+            <p class="intro">Everything you have seen so far, in four short blocks, using the same nine customers. Each block does one job from the loop diagram: prepare, compare K, fit, use.</p>
+
+            <div class="bridge"><strong>Reading the code.</strong> Lines starting with <code>#</code> are comments: notes for people, which Python ignores. Every line below has one. Words in highlighted code are explained in the notes beside each block, and all new terms are in the <a href="#glossary">glossary</a> at the end.</div>
+
+            <h3 class="step-title">Block 1: prepare and scale</h3>
+            <div class="code-grid">
+              <pre><code><span class="comment"># pandas: the library for tables of data</span>
+import pandas as pd
+<span class="comment"># StandardScaler: puts columns on comparable scales</span>
+from sklearn.preprocessing import <span class="focus">StandardScaler</span>
+<span class="comment"># KMeans: the clustering method</span>
+from sklearn.cluster import <span class="focus">KMeans</span>
+<span class="comment"># silhouette_score: marks how well-separated the groups are</span>
+from sklearn.metrics import silhouette_score
+
+<span class="comment"># build the table from Section 01 (a DataFrame)</span>
+customers = pd.DataFrame({
+    "customer": list("ABCDEFGHI"),   <span class="comment"># the letters A to I</span>
+    "spend":  [100, 150, 200, 600, 650, 580, 1000, 1050, 950],
+    "visits": [10, 12, 8, 55, 60, 62, 10, 13, 8],
+})
+
+<span class="comment"># keep only the columns to cluster on (not the letter)</span>
+features = customers[["spend", "visits"]]
+
+<span class="comment"># fit_transform: learn each column's average and spread,</span>
+<span class="comment"># then return the scaled numbers from Section 03</span>
+scaler = StandardScaler()
+X = scaler.fit_transform(features)</code></pre>
+              <aside class="code-notes"><p class="eyebrow">Read down the code</p><ol><li><strong>Import</strong> three specific tools: one prepares data, one clusters, one scores.</li><li><strong>Build</strong> the same table as Section 01.</li><li><strong>Select</strong> only the numeric columns to cluster on. The customer letter is a label, not a feature.</li><li><strong>Scale</strong>: <code>fit_transform</code> learns each column's mean and standard deviation, then returns the scaled table from Section 03.</li></ol></aside>
+            </div>
+
+            <h3 class="step-title">Block 2: compare several K</h3>
+            <div class="code-grid">
+              <pre><code><span class="comment"># try K = 2, 3, 4, 5, 6 (range stops before 7)</span>
+for k in range(2, 7):
+    <span class="comment"># n_init=10: run from 10 different starts, keep the best</span>
+    <span class="comment"># random_state=42: any fixed number, so results repeat</span>
+    <span class="comment"># fit = run K-Means on the scaled data</span>
+    model = KMeans(n_clusters=k, n_init=10,
+                   random_state=42).fit(X)
+    <span class="comment"># labels_ = the group number for each row</span>
+    score = silhouette_score(X, model.labels_)
+    <span class="comment"># inertia_ = squared distances to centres (Section 05)</span>
+    print(k, round(model.<span class="focus">inertia_</span>, 3), round(score, 3))</code></pre>
+              <aside class="code-notes"><p class="eyebrow">Read down the code</p><ol><li><strong>Loop</strong> over candidate values of K.</li><li><strong>Fit</strong> K-Means with ten starts and a fixed seed (Section 07).</li><li><strong>Score</strong> the grouping with the mean silhouette.</li><li><strong>Print</strong> K, inertia and silhouette. Plot these to get the two charts from Section 06.</li></ol></aside>
+            </div>
+            <pre class="output">2 8.698 0.554
+3 0.19 0.897
+4 0.14 0.671
+5 0.094 0.424
+6 0.052 0.202</pre>
+
+            <h3 class="step-title">Block 3: fit the chosen K and describe the groups</h3>
+            <div class="code-grid">
+              <pre><code><span class="comment"># fit the final model with the chosen K = 3</span>
+model = KMeans(n_clusters=3, n_init=10,
+               random_state=42).fit(X)
+<span class="comment"># add each row's group number as a new column</span>
+customers["cluster"] = model.<span class="focus">labels_</span>
+
+<span class="comment"># groupby: split the table by group number;</span>
+<span class="comment"># agg: work out one summary per group</span>
+profile = customers.groupby("cluster").agg(
+    spend=("spend", "mean"),       <span class="comment"># average spend</span>
+    visits=("visits", "mean"),     <span class="comment"># average visits</span>
+    size=("customer", "count"),    <span class="comment"># how many customers</span>
+)
+print(profile)</code></pre>
+              <aside class="code-notes"><p class="eyebrow">Read down the code</p><ol><li><strong>Fit</strong> the final model with K = 3.</li><li><strong>Attach</strong> each row's group number to the original table. <code>labels_</code> is in the same row order as <code>X</code>.</li><li><strong>Profile</strong>: average each column per group, in the original units, and count the rows.</li></ol></aside>
+            </div>
+            <pre class="output">          spend     visits  size
+cluster                         
+0         610.0  59.000000     3
+1        1000.0  10.333333     3
+2         150.0  10.000000     3</pre>
+
+            <h3 class="step-title">Block 4: place a new customer</h3>
+            <div class="code-grid">
+              <pre><code><span class="comment"># one new customer, with the same two columns</span>
+new = pd.DataFrame({"spend": [700], "visits": [45]})
+<span class="comment"># transform (not fit_transform): scale with the SAME averages</span>
+<span class="comment"># and spreads learned from the original nine customers</span>
+new_scaled = scaler.<span class="focus">transform</span>(new)
+<span class="comment"># predict: the number of the nearest centre</span>
+print(model.<span class="focus">predict</span>(new_scaled))</code></pre>
+              <aside class="code-notes"><p class="eyebrow">Read down the code</p><ol><li><strong>Describe</strong> the new customer with the same two columns.</li><li><strong>Scale</strong> with the <em>already fitted</em> scaler: <code>transform</code>, not <code>fit_transform</code>, so the new row uses the original means and standard deviations.</li><li><strong>Predict</strong>: return the number of the nearest centre. No refitting happens.</li></ol></aside>
+            </div>
+            <pre class="output">[0]</pre>
+            <figure>
+              <div class="plot"><svg viewBox="0 0 720 460" role="img" aria-labelledby="new-t new-d"><title id="new-t">A new customer is placed by nearest centre</title><desc id="new-d">The three fitted groups with their centres and a new open circle at £700 and 45 visits. Its nearest centre is centre 1.</desc><rect width="720" height="460" fill="#fff"/><g stroke="#c7c7bf" stroke-width="1"><line x1="72.0" y1="24" x2="72.0" y2="398"/><line x1="228.0" y1="24" x2="228.0" y2="398"/><line x1="384.0" y1="24" x2="384.0" y2="398"/><line x1="540.0" y1="24" x2="540.0" y2="398"/><line x1="696.0" y1="24" x2="696.0" y2="398"/><line x1="72" y1="398.0" x2="696" y2="398.0"/><line x1="72" y1="303.8" x2="696" y2="303.8"/><line x1="72" y1="209.7" x2="696" y2="209.7"/><line x1="72" y1="115.5" x2="696" y2="115.5"/></g><line x1="72" y1="398" x2="696" y2="398" stroke="#111111" stroke-width="1.5"/><line x1="72" y1="398" x2="72" y2="24" stroke="#111111" stroke-width="1.5"/><g fill="#64645e" font-family="DM Mono, ui-monospace, monospace" font-size="12"><text x="72.0" y="416" text-anchor="middle">£0</text><text x="228.0" y="416" text-anchor="middle">£300</text><text x="384.0" y="416" text-anchor="middle">£600</text><text x="540.0" y="416" text-anchor="middle">£900</text><text x="696.0" y="416" text-anchor="middle">£1,200</text><text x="64" y="402.0" text-anchor="end">0</text><text x="64" y="307.8" text-anchor="end">20</text><text x="64" y="213.7" text-anchor="end">40</text><text x="64" y="119.5" text-anchor="end">60</text><text x="384.0" y="446" text-anchor="middle">annual spend (£)</text><text x="16" y="211.0" transform="rotate(-90 16 211.0)" text-anchor="middle">visits per year</text></g><circle cx="124.0" cy="350.9" r="7" fill="#111111"/><text x="134.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">A</text><circle cx="150.0" cy="341.5" r="7" fill="#111111"/><text x="160.0" y="333.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">B</text><circle cx="176.0" cy="360.3" r="7" fill="#111111"/><text x="186.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">C</text><rect x="377.0" y="132.1" width="14" height="14" fill="#135d77"/><text x="394.0" y="131.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">D</text><rect x="403.0" y="108.5" width="14" height="14" fill="#135d77"/><text x="420.0" y="107.5" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">E</text><rect x="366.6" y="99.1" width="14" height="14" fill="#135d77"/><text x="383.6" y="98.1" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">F</text><path d="M592.0 342.4 L600.5 350.9 L592.0 359.4 L583.5 350.9z" fill="#a54e2c"/><text x="602.0" y="342.9" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">G</text><path d="M618.0 328.3 L626.5 336.8 L618.0 345.3 L609.5 336.8z" fill="#a54e2c"/><text x="628.0" y="328.8" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">H</text><path d="M566.0 351.8 L574.5 360.3 L566.0 368.8 L557.5 360.3z" fill="#a54e2c"/><text x="576.0" y="352.3" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">I</text><path d="M150.0 339.9 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="150.0" y="374.9" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">centre 0</text><path d="M389.2 109.3 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="389.2" y="144.3" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">centre 1</text><path d="M592.0 338.4 l10 17 -20 0z" fill="#d9ff38" stroke="#111111" stroke-width="1.6"/><text x="592.0" y="373.4" text-anchor="middle" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12" paint-order="stroke" stroke="#fff" stroke-width="3">centre 2</text><circle cx="436.0" cy="186.2" r="9" fill="#fff" stroke="#111111" stroke-width="2.5"/><text x="450.0" y="190.2" fill="#111111" font-family="DM Mono, ui-monospace, monospace" font-size="12">new customer (£700, 45 visits)</text></svg></div>
+              <figcaption>Scaled distances from the new customer to each centre: centre 0: 2.18, centre 1: 0.66, centre 2: 1.73. The nearest is centre 1, the mid-spend, frequent-visit group.</figcaption>
+            </figure>
+            <div class="note"><strong>About these outputs.</strong> They were produced by running the code above with scikit-learn 1.8.0rc1 and pandas 3.0.1. The inertia and silhouette values match the calculation behind every chart on this page. The group <em>numbers</em> are different from the charts: scikit-learn happens to call the mid-spend group 0 and the low-spend group 2, while the charts on this page call them 1 and 0. Cluster numbers are arbitrary name tags, so the groups themselves are the same; only the labels differ.</div>
+          </div>
+        </section>
+
+        <section id="interpret" class="section">
+          <div class="section-index"><b>11</b><span>Describe<br>the<br>groups</span></div>
+          <div class="section-main">
+            <h2>A group number is not a meaning</h2>
+            <p class="intro">K-Means stops at "customers A, B and C are group 0". Turning that into something useful is analysis work: describe each group in the original units, name it cautiously, and check it is stable before anyone acts on it.</p>
+            <div class="profile">
+              <table aria-label="Profile of the three groups">
+                <thead><tr><th>Group</th><th>Customers</th><th>Mean spend</th><th>Mean visits</th><th>A possible description</th></tr></thead>
+                <tbody><tr><td>0</td><td>ABC</td><td>£150</td><td>10.0</td><td>low spend, few visits</td></tr><tr><td>1</td><td>DEF</td><td>£610</td><td>59.0</td><td>mid spend, frequent visits</td></tr><tr><td>2</td><td>GHI</td><td>£1,000</td><td>10.3</td><td>high spend, few visits</td></tr></tbody>
+              </table>
+            </div>
+            <p class="profile-note">The group centres, converted back to original units: £150 and 10.0 visits; £610 and 59.0 visits; £1,000 and 10.3 visits. These are the same numbers as the profile, because each centre is the mean of its members.</p>
+            <div class="split">
+              <article class="panel"><h3>Good practice <small>describing groups</small></h3><ul><li>Report the group sizes. A group of one row is usually an outlier, not a segment.</li><li>Describe groups by the columns that differ most between them.</li><li>Use cautious names ("frequent, mid-spend") rather than claims ("loyal customers").</li><li>Refit with a different <code>random_state</code> or on a sample. If the groups change a lot, say so.</li></ul></article>
+              <article class="panel"><h3>Seeing many columns <small>PCA</small></h3><ul><li>With more than two columns you cannot draw the feature space directly. PCA can squash it to two dimensions for a picture (<a href="https://scikit-learn.org/stable/modules/decomposition.html#principal-component-analysis-pca">scikit-learn PCA guide</a>).</li><li>PCA re-expresses the columns; it does not create groups. Clustering on all columns and clustering on two PCA components are different analyses. Say which one you did.</li><li>A 2-D picture of 10-D groups can make them look more mixed than they are.</li></ul></article>
+            </div>
+            <div class="note"><strong>Groups describe, they do not explain.</strong> Finding that frequent visitors spend a mid-range amount does not show that visiting causes spending, or the reverse. Clustering is exploratory: it suggests questions for further analysis.</div>
+          </div>
+        </section>
+
+        <section id="alternatives" class="section">
+          <div class="section-index"><b>12</b><span>Other<br>methods</span></div>
+          <div class="section-main">
+            <h2>When the shape is wrong, change the method</h2>
+            <p class="intro">Each clustering method has its own idea of what a group looks like. Match the method to the shape you expect. scikit-learn's <a href="https://scikit-learn.org/stable/auto_examples/cluster/plot_cluster_comparison.html">clustering comparison</a> runs many methods side by side on the same toy shapes; it is the best single picture of these differences, though 2-D toy data does not always predict how a method behaves on real, many-column data.</p>
+            <div class="compare">
+              <article class="km">
+                <div class="tag">Compact groups</div>
+                <h3>K-Means</h3>
+                <svg class="mini-shape" viewBox="0 0 190 70" role="img" aria-label="Compact round groups with centre markers"><circle cx="34" cy="35" r="4"/><circle cx="47" cy="27" r="4"/><circle cx="52" cy="43" r="4"/><circle cx="125" cy="27" r="4"/><circle cx="138" cy="38" r="4"/><circle cx="129" cy="49" r="4"/><path d="M42 35l-7 -12 14 0zM132 38l-7 -12 14 0z"/></svg>
+                <p>You choose K. Each row joins its nearest centre. Fast, simple, one hard label per row.</p>
+              </article>
+              <article>
+                <div class="tag">Nested groups</div>
+                <h3>Hierarchical</h3>
+                <svg class="mini-shape" viewBox="0 0 190 70" role="img" aria-label="Branches joining into a tree"><path d="M20 58v-12h30v12M50 46V30h35v16M85 30V18h40v12M125 18v-8h42v8M125 18H95M85 30H45M45 46H20M85 30h65v16h-20v12M150 46h20v12"/></svg>
+                <p>Merges the closest rows step by step into a tree. Cut the tree at any height to get a number of groups (<a href="https://scikit-learn.org/stable/modules/clustering.html#hierarchical-clustering">guide</a>).</p>
+              </article>
+              <article>
+                <div class="tag">Dense regions + noise</div>
+                <h3>DBSCAN</h3>
+                <svg class="mini-shape" viewBox="0 0 190 70" role="img" aria-label="Two irregular dense shapes and isolated noise points"><path d="M20 49 C35 12 65 17 76 38 C84 56 44 64 20 49zM111 20 C139 4 172 17 167 49 C156 67 113 59 111 20z" fill="none" stroke="currentColor"/><circle cx="92" cy="54" r="3"/><circle cx="178" cy="12" r="3"/></svg>
+                <p>Grows groups through crowded areas. Finds curved shapes, needs no K, and labels isolated rows as noise (<a href="https://scikit-learn.org/stable/modules/clustering.html#dbscan">guide</a>).</p>
+              </article>
+              <article>
+                <div class="tag">Soft, oval groups</div>
+                <h3>Gaussian mixtures</h3>
+                <svg class="mini-shape" viewBox="0 0 190 70" role="img" aria-label="Two overlapping ellipses"><ellipse cx="70" cy="35" rx="56" ry="20"/><ellipse cx="121" cy="35" rx="54" ry="20"/></svg>
+                <p>Models each group as a stretched oval and gives each row a probability of belonging to each group (<a href="https://scikit-learn.org/stable/modules/mixture.html">guide</a>).</p>
+              </article>
+            </div>
+            <div class="table-panel"><table aria-label="Which method for which situation">
+              <thead><tr><th>Situation</th><th>Try first</th></tr></thead>
+              <tbody>
+                <tr><td>Compact numeric groups, a rough idea of K, lots of rows</td><td>K-Means (MiniBatchKMeans if very large)</td></tr>
+                <tr><td>Curved or irregular shapes; outliers that should belong nowhere</td><td>DBSCAN</td></tr>
+                <tr><td>You want to see how groups nest inside bigger groups</td><td>Hierarchical (agglomerative)</td></tr>
+                <tr><td>Stretched, overlapping groups; you want membership probabilities</td><td>Gaussian mixture model</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+        </section>
+
+        <section id="check" class="section">
+          <div class="section-index"><b>13</b><span>Check<br>yourself</span></div>
+          <div class="section-main">
+            <h2>Can you explain it without looking?</h2>
+            <p class="intro">Answer each question in your head before opening it. The later questions need you to combine ideas from several sections.</p>
+            <div class="recall-grid">
+              <details><summary>1. What is missing from a clustering table, compared with supervised learning?</summary><p>The answer (target) column. There are features but no known group for any row.</p></details>
+              <details><summary>2. What does the Assign step change, and what does the Update step change?</summary><p>Assign changes which group each row belongs to. Update changes where each centre sits: it moves to the mean of its current members.</p></details>
+              <details><summary>3. Why does the Update step use the mean?</summary><p>For a total of squared distances, the mean is the position that makes the total smallest (the bottom of the curve in Section 05).</p></details>
+              <details><summary>4. Why not just pick the K with the lowest inertia?</summary><p>Inertia always falls as K rises and reaches zero when every row has its own centre. Look for the elbow and check silhouette values instead.</p></details>
+              <details><summary>5. A row has a silhouette value of −0.2. What does that suggest?</summary><p>On average it is closer to the rows of another group than to its own group. It is probably in the wrong group, or sits between groups.</p></details>
+              <details><summary>6. Two runs on the same data give different groups. Why, and what do you do?</summary><p>Different starting centres can settle in different places (Section 07). Use k-means++, several starts (<code>n_init</code>), and a fixed <code>random_state</code>; keep the lowest-inertia result.</p></details>
+              <details><summary>7. Why scale spend and visits before clustering?</summary><p>Without scaling, the column with the biggest numbers dominates the distance. In the P–W example, raw pounds made K-Means ignore visits completely.</p></details>
+              <details><summary>8. Your data forms two rings. Will K-Means find them?</summary><p>No. Its boundaries between centres are straight lines, so it cuts both rings in half. Try DBSCAN.</p></details>
+            </div>
+            <div class="note signal"><strong>Transfer challenge.</strong> A colleague clusters shop customers on income (in pounds) and number of visits, gets five groups, and presents them as "the five true customer types". List what you would check before accepting that.</div>
+            <details>
+              <summary>Open a model answer</summary>
+              <ul><li>Were the columns standardised, or did income in pounds swamp visits?</li><li>Why five? Show the elbow and silhouette evidence, and what the groups are for.</li><li>Are any groups tiny, suggesting outliers took them?</li><li>Do the groups stay the same across several starts and on a resample?</li><li>Is there real structure at all? K-Means returns five groups even for random noise.</li><li>"True types" overclaims. These are proposed groups to describe and test, not discovered facts.</li></ul>
+            </details>
+          </div>
+        </section>
+
+        <section id="sources" class="section">
+          <div class="section-index"><b>14</b><span>Sources</span></div>
+          <div class="section-main">
+            <h2>Where the content comes from</h2>
+            <p class="intro">The customer data, calculations and charts were made for this guide; they are not taken from any course or library output. The technical claims rest on the sources below, which are also linked where they are used.</p>
+            <div class="source-grid">
+              <article class="source-card">
+                <h3>scikit-learn documentation</h3>
+                <ul class="source-list">
+                  <li><a href="https://scikit-learn.org/stable/modules/clustering.html#k-means">User guide: K-Means</a> — the algorithm, inertia, initialisation.</li>
+                  <li><a href="https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html">KMeans API reference</a> — <code>init</code>, <code>n_init</code>, <code>random_state</code>, <code>inertia_</code>.</li>
+                  <li><a href="https://scikit-learn.org/stable/auto_examples/cluster/plot_kmeans_silhouette_analysis.html">Selecting K with silhouette analysis</a></li>
+                  <li><a href="https://scikit-learn.org/stable/modules/generated/sklearn.metrics.silhouette_score.html">silhouette_score reference</a></li>
+                  <li><a href="https://scikit-learn.org/stable/auto_examples/cluster/plot_kmeans_assumptions.html">Demonstration of K-Means assumptions</a></li>
+                  <li><a href="https://scikit-learn.org/stable/auto_examples/cluster/plot_cluster_comparison.html">Comparing clustering algorithms on toy data</a></li>
+                  <li><a href="https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html">StandardScaler reference</a></li>
+                  <li><a href="https://scikit-learn.org/stable/modules/decomposition.html#principal-component-analysis-pca">PCA user guide</a></li>
+                </ul>
+              </article>
+              <article class="source-card">
+                <h3>Original papers and a second explanation</h3>
+                <ul class="source-list">
+                  <li>Lloyd, S. (1982). Least squares quantization in PCM. <em>IEEE Transactions on Information Theory</em>. <a href="https://doi.org/10.1109/TIT.1982.1056489">doi:10.1109/TIT.1982.1056489</a> — the assign-and-update loop.</li>
+                  <li>Arthur, D. &amp; Vassilvitskii, S. (2007). k-means++: the advantages of careful seeding. <em>Proceedings of the 18th ACM-SIAM Symposium on Discrete Algorithms</em>, 1027–1035. <a href="http://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf">Author's PDF</a></li>
+                  <li>Rousseeuw, P. J. (1987). Silhouettes: a graphical aid to the interpretation and validation of cluster analysis. <em>Journal of Computational and Applied Mathematics</em> 20, 53–65. <a href="https://doi.org/10.1016/0377-0427(87)90125-7">doi:10.1016/0377-0427(87)90125-7</a></li>
+                  <li>Google for Developers, <a href="https://developers.google.com/machine-learning/clustering/kmeans/advantages-disadvantages">Clustering course: advantages and disadvantages of K-Means</a> — outliers, starting values, many dimensions.</li>
+                </ul>
+              </article>
+            </div>
+          </div>
+        </section>
+        <section id="glossary" class="section">
+          <div class="section-index"><b>15</b><span>Glossary</span></div>
+          <div class="section-main">
+            <h2>Words used in this guide</h2>
+            <p class="intro">Every technical term used in this guide, in plain English, in alphabetical order.</p>
+            <div class="table-panel glossary"><table aria-label="Glossary"><thead><tr><th>Term</th><th>What it means</th></tr></thead><tbody><tr><th scope="row">Array</th><td>A grid of numbers, like a table with no column names. scikit-learn models take their input as an array. <code>.to_numpy()</code> turns a pandas table into one.</td></tr><tr><th scope="row">Centre (centroid)</th><td>The average position of all the rows in one group. K-Means moves each centre to this average at every Update step.</td></tr><tr><th scope="row">Cluster</th><td>A group of rows that the method has decided belong together.</td></tr><tr><th scope="row">Clustering</th><td>Finding groups in data when nobody has said what the groups are. It is a kind of unsupervised learning.</td></tr><tr><th scope="row">DataFrame</th><td>pandas' name for a table: rows and named columns, like a spreadsheet inside Python.</td></tr><tr><th scope="row">Distance</th><td>How far apart two rows are. Both guides use straight-line (Euclidean) distance: square the gap in each column, add the squares, take the square root.</td></tr><tr><th scope="row">Elbow method</th><td>Plot inertia for several values of K and look for the point where adding another group stops helping much.</td></tr><tr><th scope="row">Feature</th><td>A column used as input to the method, such as spend or km east. Label columns like a customer letter are not features.</td></tr><tr><th scope="row">Fit</th><td>Run the method on your data so it can learn from it. <code>.fit(X)</code> is where the actual work happens.</td></tr><tr><th scope="row">Inertia (WCSS)</th><td>Add up the squared distance from every row to its own group centre. Smaller means tighter groups. WCSS stands for within-cluster sum of squares.</td></tr><tr><th scope="row">K</th><td>The number of groups you ask K-Means to find. You must choose it.</td></tr><tr><th scope="row">k-means++</th><td>A way of choosing starting centres that spreads them out, so the method is less likely to get stuck.</td></tr><tr><th scope="row">Label</th><td>The group number the method gives each row, stored in <code>labels_</code>. It is a name tag (0, 1, 2 …), not a meaning.</td></tr><tr><th scope="row"><code>n_init</code></th><td>How many times K-Means runs from different starting centres. The run with the lowest inertia is kept.</td></tr><tr><th scope="row">pandas / <code>pd</code></th><td>The Python library for working with tables. <code>pd</code> is the usual short name for it.</td></tr><tr><th scope="row">Parameter</th><td>A setting you choose before running a method, such as <code>n_clusters</code>, <code>eps</code> or <code>min_samples</code>.</td></tr><tr><th scope="row">PCA</th><td>Principal component analysis: a way of squashing many columns into fewer for a picture. It does not create groups.</td></tr><tr><th scope="row"><code>predict</code></th><td>Give a new row the number of its nearest centre, using a model that has already been fitted.</td></tr><tr><th scope="row"><code>random_state</code></th><td>A fixed number that makes the random parts of a method repeat exactly, so you get the same answer every run.</td></tr><tr><th scope="row">Row</th><td>One record in the table: one customer, one pothole report.</td></tr><tr><th scope="row">Scaling / standardising</th><td>Putting columns on comparable scales before measuring distance, so one column does not dominate just because its numbers are bigger.</td></tr><tr><th scope="row">scikit-learn / <code>sklearn</code></th><td>The Python library that provides K-Means, DBSCAN and many other methods. It is imported under the name <code>sklearn</code>.</td></tr><tr><th scope="row">Silhouette value</th><td>A score from −1 to +1 for each row: near +1 means it sits well inside its group, near 0 means on a boundary, below 0 means probably in the wrong group.</td></tr><tr><th scope="row">Standard deviation</th><td>A measure of how spread out a column's values are: roughly, the typical distance of a value from the column's average. Small means values are bunched together; large means they are spread out.</td></tr><tr><th scope="row"><code>transform</code> / <code>fit_transform</code></th><td><code>fit_transform</code> learns a column's average and spread and scales it in one go. <code>transform</code> scales new data using what was already learned.</td></tr><tr><th scope="row">Unsupervised learning</th><td>Learning from data that has no answer column. The method has to find structure by itself.</td></tr></tbody></table></div>
+          </div>
+        </section>
+      </div>
+
+      <footer class="page-footer">
+        Independently written learning material in SciKit Style for local study; not official Code Institute or scikit-learn material. Teaching data and diagrams were created for this guide.
+      </footer>
+    </main>
+  </div>
+  <script>
+  (function () {
+    // ---------- K-Means stepper: runs the real loop on customers A-I ----------
+    var D = {"names": ["A", "B", "C", "D", "E", "F", "G", "H", "I"], "spend": [100, 150, 200, 600, 650, 580, 1000, 1050, 950], "visits": [10, 12, 8, 55, 60, 62, 10, 13, 8], "z": [[-1.392815305046439, -0.7108651148152265], [-1.2497178421992021, -0.6244085467971584], [-1.1066203793519651, -0.7973216828332945], [0.038159323425929946, 1.2344076655913057], [0.18125678627316683, 1.4505490856364758], [-0.01907966171296481, 1.537005653654544], [1.182939026203825, -0.7108651148152265], [1.3260364890510619, -0.5811802627881243], [1.0398415633565883, -0.7973216828332945]], "mS": 586.6666666666666, "sS": 349.41220483676426, "mV": 26.444444444444443, "sV": 23.133002452538143, "starts": {"recover": [0, 1, 5], "stuck": [0, 2, 6], "spread": [0, 4, 7]}, "xr": [0, 1200], "yr": [0, 79.4465750159308]};
+    var NS = 'http://www.w3.org/2000/svg';
+    var W = 720, H = 460, L = 72, R = 24, T = 24, B = 62;
+    var COLS = ['#111111', '#135d77', '#a54e2c'];
+    var px = function (v) { return L + (v - D.xr[0]) / (D.xr[1] - D.xr[0]) * (W - L - R); };
+    var py = function (v) { return H - B - (v - D.yr[0]) / (D.yr[1] - D.yr[0]) * (H - T - B); };
+    var rawX = function (z) { return z * D.sS + D.mS; };
+    var rawY = function (z) { return z * D.sV + D.mV; };
+    var d2 = function (p, q) { return (p[0] - q[0]) * (p[0] - q[0]) + (p[1] - q[1]) * (p[1] - q[1]); };
+    var state;
+
+    function reset(key) {
+      state = { key: key, C: D.starts[key].map(function (i) { return D.z[i].slice(); }),
+                labels: null, stage: 'start', round: 0, done: false, n: 0 };
+      var who = list(D.starts[key].map(function (i) { return D.names[i]; }));
+      render({ title: 'Ready to start',
+        what: 'K-Means has placed three centres (the lime triangles) on customers ' + who + '. No customer belongs to a group yet.',
+        change: 'Three lime triangles, labelled c1 to c3. Every customer is still grey.',
+        why: 'K-Means has to start somewhere. Where the centres start can change where they finish: try all three buttons above (Section 07 explains why).' });
+    }
+    function assign() {
+      return D.z.map(function (p) {
+        var best = 0;
+        for (var k = 1; k < state.C.length; k++) if (d2(p, state.C[k]) < d2(p, state.C[best])) best = k;
+        return best;
+      });
+    }
+    function inertia() {
+      if (!state.labels) return null;
+      return D.z.reduce(function (s, p, i) { return s + d2(p, state.C[state.labels[i]]); }, 0);
+    }
+    function groups() {
+      if (!state.labels) return '—';
+      var out = [];
+      for (var k = 0; k < state.C.length; k++) {
+        var g = D.names.filter(function (n, i) { return state.labels[i] === k; }).join('');
+        if (g) out.push(g);
+      }
+      return out.join(' / ');
+    }
+    function list(a) { return a.length > 1 ? a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1] : (a[0] || ''); }
+    function step() {
+      if (state.done) return;
+      state.n += 1;
+      var before = inertia();
+      if (state.stage === 'start' || state.stage === 'update') {
+        var nl = assign(), prev = state.labels;
+        state.round += 1;
+        var moved = prev ? D.names.filter(function (n, i) { return nl[i] !== prev[i]; }) : null;
+        state.labels = nl; state.stage = 'assign';
+        var now = inertia();
+        if (prev && moved.length === 0) {
+          state.done = true;
+          var stuck = now > 1;
+          render({ title: 'Round ' + state.round + ', Assign: nothing changes, so K-Means stops',
+            what: 'K-Means checked every customer against the moved centres. Every customer is still nearest to the same centre as before.',
+            change: 'Nothing moves. Final inertia: ' + now.toFixed(2) + '. Groups: ' + groups() + '.',
+            why: stuck ? 'This start has got stuck. Two centres share one clump and one centre is stretched across the other two, and no step of the loop can pull them apart. Compare this inertia with the other starts (Section 07).'
+                       : 'The groups are stable, so this is the answer K-Means gives. Its inertia is as low as this data allows for K = 3.' });
+        } else if (!prev) {
+          render({ title: 'Round 1, Assign: every customer joins its nearest centre',
+            what: 'For each customer, K-Means measures the straight-line distance to all three centres and picks the shortest.',
+            change: 'Each customer takes the colour and shape of its nearest centre. Dashed lines show which one. Inertia (the total squared length of those lines) is now ' + now.toFixed(2) + '.',
+            why: 'This is the first half of the loop. Short dashed lines mean tight groups; K-Means is trying to make the total as small as it can.' });
+        } else {
+          render({ title: 'Round ' + state.round + ', Assign: ' + list(moved) + (moved.length === 1 ? ' changes' : ' change') + ' group',
+            what: 'The centres moved in the last step, so K-Means checks again which centre is nearest to each customer.',
+            change: list(moved) + (moved.length === 1 ? ' is' : ' are') + ' now nearer a different centre and switch' + (moved.length === 1 ? 'es' : '') + ' group. Inertia: ' + before.toFixed(2) + ' → ' + now.toFixed(2) + '.',
+            why: 'Every switch shortens a dashed line, so inertia goes down. The loop keeps going until nobody switches.' });
+        }
+      } else {
+        state.C = state.C.map(function (c, k) {
+          var m = D.z.filter(function (p, i) { return state.labels[i] === k; });
+          if (!m.length) return c;
+          return [m.reduce(function (s, p) { return s + p[0]; }, 0) / m.length,
+                  m.reduce(function (s, p) { return s + p[1]; }, 0) / m.length];
+        });
+        state.stage = 'update';
+        render({ title: 'Round ' + state.round + ', Update: each centre moves to the middle of its group',
+          what: 'Each centre moves to the average position (the mean) of the customers that joined it: the average spend and the average visits.',
+          change: 'The lime triangles jump to the middle of their groups. Inertia: ' + before.toFixed(2) + ' → ' + inertia().toFixed(2) + '.',
+          why: 'The mean is the position that makes the squared distances smallest (Section 05), so this step can only lower inertia or keep it the same. Next, some customers may now be nearer a different centre.' });
+      }
+    }
+    function el(tag, attrs, text) {
+      var e = document.createElementNS(NS, tag);
+      for (var a in attrs) e.setAttribute(a, attrs[a]);
+      if (text) e.textContent = text;
+      return e;
+    }
+    function markerEl(k, x, y) {
+      var r = 7;
+      if (k === null) return el('circle', { cx: x, cy: y, r: r, fill: '#9c9c94' });
+      if (k % 3 === 0) return el('circle', { cx: x, cy: y, r: r, fill: COLS[k] });
+      if (k % 3 === 1) return el('rect', { x: x - r, y: y - r, width: 2 * r, height: 2 * r, fill: COLS[k] });
+      return el('path', { d: 'M' + x + ' ' + (y - r - 1.5) + ' L' + (x + r + 1.5) + ' ' + y + ' L' + x + ' ' + (y + r + 1.5) + ' L' + (x - r - 1.5) + ' ' + y + 'z', fill: COLS[k] });
+    }
+    function render(info) {
+      var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'K-Means stepper chart. ' + info.title });
+      svg.appendChild(el('rect', { width: W, height: H, fill: '#fff' }));
+      [0, 300, 600, 900, 1200].forEach(function (t) {
+        svg.appendChild(el('line', { x1: px(t), y1: T, x2: px(t), y2: H - B, stroke: '#c7c7bf' }));
+        svg.appendChild(el('text', { x: px(t), y: H - B + 18, 'text-anchor': 'middle', fill: '#64645e', 'font-family': 'DM Mono, monospace', 'font-size': 12 }, '£' + t.toLocaleString('en-GB')));
+      });
+      [0, 20, 40, 60].forEach(function (t) {
+        svg.appendChild(el('line', { x1: L, y1: py(t), x2: W - R, y2: py(t), stroke: '#c7c7bf' }));
+        svg.appendChild(el('text', { x: L - 8, y: py(t) + 4, 'text-anchor': 'end', fill: '#64645e', 'font-family': 'DM Mono, monospace', 'font-size': 12 }, String(t)));
+      });
+      svg.appendChild(el('line', { x1: L, y1: H - B, x2: W - R, y2: H - B, stroke: '#111', 'stroke-width': 1.5 }));
+      svg.appendChild(el('line', { x1: L, y1: H - B, x2: L, y2: T, stroke: '#111', 'stroke-width': 1.5 }));
+      svg.appendChild(el('text', { x: (L + W - R) / 2, y: H - 14, 'text-anchor': 'middle', fill: '#64645e', 'font-family': 'DM Mono, monospace', 'font-size': 12 }, 'annual spend (£)'));
+      if (state.labels) {
+        D.z.forEach(function (p, i) {
+          var c = state.C[state.labels[i]];
+          svg.appendChild(el('line', { x1: px(D.spend[i]), y1: py(D.visits[i]), x2: px(rawX(c[0])), y2: py(rawY(c[1])), stroke: '#a54e2c', 'stroke-width': 1.3, 'stroke-dasharray': '4 3' }));
+        });
+      }
+      D.z.forEach(function (p, i) {
+        svg.appendChild(markerEl(state.labels ? state.labels[i] : null, px(D.spend[i]), py(D.visits[i])));
+        svg.appendChild(el('text', { x: px(D.spend[i]) + 10, y: py(D.visits[i]) - 8, fill: '#111', 'font-family': 'DM Mono, monospace', 'font-size': 12 }, D.names[i]));
+      });
+      state.C.forEach(function (c, k) {
+        var x = px(rawX(c[0])), y = py(rawY(c[1]));
+        svg.appendChild(el('path', { d: 'M' + x + ' ' + (y - 11) + ' l10 17 -20 0z', fill: '#d9ff38', stroke: '#111', 'stroke-width': 1.6 }));
+        svg.appendChild(el('text', { x: x + 12, y: y - 6, fill: '#111', 'font-family': 'DM Mono, monospace', 'font-size': 12 }, 'c' + (k + 1)));
+      });
+      var host = document.getElementById('stepper-plot');
+      host.innerHTML = ''; host.appendChild(svg);
+      var inn = inertia();
+      document.getElementById('st-stage').textContent = state.done ? 'finished' : state.stage;
+      document.getElementById('st-round').textContent = state.round;
+      document.getElementById('st-inertia').textContent = inn === null ? '—' : inn.toFixed(2);
+      document.getElementById('st-groups').textContent = groups();
+      document.getElementById('ex-kicker').textContent = 'Step ' + state.n;
+      document.getElementById('ex-title').textContent = info.title;
+      document.getElementById('ex-what').textContent = info.what;
+      document.getElementById('ex-change').textContent = info.change;
+      document.getElementById('ex-why').textContent = info.why;
+      document.getElementById('step-next').disabled = state.done;
+      document.getElementById('step-run').disabled = state.done;
+    }
+    var buttons = document.querySelectorAll('[data-start]');
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () {
+        buttons.forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+        reset(b.getAttribute('data-start'));
+      });
+    });
+    document.getElementById('step-next').addEventListener('click', step);
+    document.getElementById('step-run').addEventListener('click', function () { var n = 0; while (!state.done && n++ < 100) step(); });
+    document.getElementById('step-reset').addEventListener('click', function () { reset(state.key); });
+    reset('recover');
+
+    // ---------- rail: mark the section currently in view ----------
+    var links = Array.prototype.slice.call(document.querySelectorAll('.rail nav a'));
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          links.forEach(function (a) {
+            var on = a.getAttribute('href') === '#' + e.target.id;
+            a.classList.toggle('active', on);
+            if (on) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current');
+          });
+        });
+      }, { rootMargin: '-35% 0px -60% 0px' });
+      links.forEach(function (a) { var s = document.querySelector(a.getAttribute('href')); if (s) io.observe(s); });
+    }
+  })();
+  </script>
+</body>
+</html>

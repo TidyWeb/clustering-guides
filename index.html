@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A gentle visual introduction to clustering: rows, features, similarity, and how to choose a first method.">
+  <title>Clustering — An overview</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <style>
+    /* Self-hosted fonts (SIL Open Font License, see assets/fonts/OFL-*.txt) */
+    /* Self-hosted Liberation Sans (SIL OFL, see assets/fonts/OFL-Liberation-Sans.txt) */
+    @font-face { font-family: 'Liberation Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('assets/fonts/liberation-sans-regular.woff2') format('woff2'); }
+    @font-face { font-family: 'Liberation Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url('assets/fonts/liberation-sans-bold.woff2') format('woff2'); }
+    @font-face { font-family: 'Liberation Sans'; font-style: italic; font-weight: 400; font-display: swap; src: url('assets/fonts/liberation-sans-italic.woff2') format('woff2'); }
+    @font-face { font-family: 'Liberation Sans'; font-style: italic; font-weight: 700; font-display: swap; src: url('assets/fonts/liberation-sans-bold-italic.woff2') format('woff2'); }
+    @font-face { font-family: 'DM Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('assets/fonts/dm-mono-400.woff2') format('woff2'); }
+    @font-face { font-family: 'DM Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('assets/fonts/dm-mono-500.woff2') format('woff2'); }
+    :root {
+      --ink: #111111;
+      --paper: #f6f6f2;
+      --white: #ffffff;
+      --soft: #e9e9e3;
+      --line: #c7c7bf;
+      --quiet: #64645e;
+      --signal: #d9ff38;
+      --signal-ink: #324000;
+      --blue: #135d77;
+      --orange: #a54e2c;
+      --mono: 'DM Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+      --sans: 'Liberation Sans', Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; color: var(--ink); background: var(--paper); font: 17px/1.55 var(--sans); }
+    a { color: inherit; }
+    code { padding: .08em .28em; background: #e7e7e0; font: .88em var(--mono); }
+    .skip { position: fixed; z-index: 20; top: -4rem; left: 1rem; padding: .5rem .75rem; color: var(--ink); background: var(--signal); }
+    .skip:focus { top: 0; }
+
+    .shell { display: grid; grid-template-columns: 14.25rem minmax(0, 1fr); min-height: 100vh; }
+    .rail { position: sticky; top: 0; display: flex; flex-direction: column; height: 100vh; padding: 1.25rem 1rem 1rem; color: #f4f4ee; background: var(--ink); }
+    .rail-top { display: flex; gap: .7rem; align-items: center; padding-bottom: 1.15rem; border-bottom: 1px solid #4a4a45; text-decoration: none; }
+    .mark { display: grid; width: 2.35rem; height: 2.35rem; place-items: center; color: var(--ink); background: var(--signal); font: 700 .72rem/1 var(--mono); letter-spacing: -.08em; }
+    .rail-kicker, .rail-title { margin: 0; }
+    .rail-kicker { color: var(--signal); font: 500 .61rem/1.25 var(--mono); letter-spacing: .09em; text-transform: uppercase; }
+    .rail-title { display: block; margin-top: .22rem; font-size: .88rem; font-weight: 600; line-height: 1.15; }
+    .rail nav { margin-top: 1.5rem; }
+    .rail ol { margin: 0; padding: 0; list-style: none; }
+    .rail li + li { margin-top: .12rem; }
+    .rail li a { display: grid; grid-template-columns: 1.6rem 1fr; gap: .42rem; padding: .5rem .3rem; color: #d3d3cc; text-decoration: none; font-size: .76rem; line-height: 1.25; border-left: 2px solid transparent; }
+    .rail li a:hover, .rail li a:focus { color: #fff; background: #242421; border-left-color: var(--signal); outline: none; }
+    .rail li span { color: var(--signal); font: .61rem/1.55 var(--mono); }
+    .rail-note { margin: 1.2rem .3rem; color: #9d9d95; font-size: .72rem; line-height: 1.45; }
+    .tidy { display: flex; gap: .52rem; align-items: center; margin-top: auto; padding: .9rem .25rem 0; color: #a8a8a0; border-top: 1px solid #4a4a45; font-size: .65rem; line-height: 1.25; text-decoration: none; }
+    .tidy img { width: 1.7rem; height: 1.7rem; object-fit: contain; filter: grayscale(1) contrast(1.1); }
+
+    main { min-width: 0; overflow: hidden; background-image: linear-gradient(#0000 95%, rgb(17 17 17 / .045) 95%), linear-gradient(90deg, #0000 95%, rgb(17 17 17 / .045) 95%); background-size: 100% 2rem, 2rem 100%; }
+    .topline { display: flex; justify-content: space-between; gap: 1rem; padding: .72rem clamp(1.25rem, 5vw, 5rem); color: #e7e7e2; background: var(--ink); font: .65rem var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+    .topline span:last-child { color: var(--signal); }
+
+    .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(24rem, .86fr); gap: clamp(1.5rem, 4vw, 5rem); align-items: end; max-width: 91rem; margin: auto; padding: clamp(3rem, 7vw, 7rem) clamp(1.25rem, 5vw, 5rem) 4rem; }
+    .eyebrow { margin: 0 0 .85rem; color: var(--quiet); font: .67rem var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 47rem; margin-bottom: 1.4rem; font-size: clamp(3.35rem, 8.2vw, 7.4rem); font-weight: 600; letter-spacing: -.075em; line-height: .86; }
+    h1 .outline { color: transparent; -webkit-text-stroke: 1.6px var(--ink); }
+    .hero-subtitle { max-width: 39rem; margin: -0.45rem 0 1.55rem; color: var(--quiet); font-size: clamp(1.55rem, 3.1vw, 2.8rem); font-weight: 600; letter-spacing: -.055em; line-height: 1; }
+    .lede { max-width: 39rem; margin-bottom: 0; font-size: clamp(1.06rem, 1.6vw, 1.28rem); line-height: 1.48; }
+    .hero-figure { position: relative; padding: 1rem; color: #f6f6f2; background: var(--ink); outline: 1px solid var(--ink); outline-offset: 7px; }
+    .hero-figure::before { position: absolute; top: .55rem; left: .8rem; content: 'THE CENTRAL IDEA'; color: var(--signal); font: .6rem var(--mono); letter-spacing: .09em; }
+    .hero-figure svg { display: block; width: 100%; height: auto; margin-top: 1rem; }
+    .hero-figure figcaption { margin-top: .35rem; padding-top: .7rem; color: #adada6; border-top: 1px solid #44443f; font: .66rem/1.4 var(--mono); }
+
+    .content { max-width: 91rem; margin: auto; padding: 0 clamp(1.25rem, 5vw, 5rem) 5rem; }
+    section { scroll-margin-top: 1rem; }
+    .record { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 0 1.5rem; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+    .record div { min-height: 5.5rem; padding: 1rem; border-right: 1px solid var(--ink); }
+    .record div:last-child { border-right: 0; }
+    .record strong { display: block; margin-bottom: .35rem; color: var(--quiet); font: .6rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .record div:last-child strong { color: var(--orange); }
+
+    .note { margin: 1.4rem 0; padding: .95rem 1rem; border-left: 3px solid var(--ink); background: var(--white); }
+    .note.signal { border-left-color: var(--signal); }
+    .note strong { background: var(--signal); }
+    .contents { display: grid; grid-template-columns: 10rem 1fr; gap: 1.5rem; margin: 2rem 0 1rem; padding: 1rem 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+    .contents > strong { font: .65rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .contents ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem 1.5rem; margin: 0; padding-left: 1.2rem; }
+    .contents a { text-decoration-thickness: .08em; text-underline-offset: .17em; }
+
+    .section { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: clamp(1rem, 4vw, 4.6rem); padding: 5rem 0; border-top: 1px solid var(--ink); }
+    .section-index { padding-top: .45rem; }
+    .section-index b { display: block; font: 500 2rem/.82 var(--mono); letter-spacing: -.12em; }
+    .section-index span { display: block; margin-top: .9rem; color: var(--quiet); font: .6rem/1.3 var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+    .section-main { min-width: 0; }
+    h2 { max-width: 57rem; margin-bottom: 1rem; font-size: clamp(2.15rem, 4.5vw, 4.7rem); font-weight: 600; letter-spacing: -.06em; line-height: .94; }
+    h3 { font-size: 1.32rem; line-height: 1; letter-spacing: -.035em; }
+    .intro { max-width: 49rem; margin-bottom: 2.1rem; color: #363632; font-size: 1.08rem; }
+    .bridge { max-width: 54rem; margin: 1.2rem 0; padding: .85rem 0 .15rem 1rem; border-left: 3px solid var(--ink); font-size: .92rem; }
+    .bridge strong { background: var(--signal); }
+
+    .data-stage { display: grid; grid-template-columns: minmax(0, 1fr) 14rem; border: 1px solid var(--ink); background: var(--white); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: .75rem .9rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { background: #efefeb; font: .63rem var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .data-stage aside { display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; color: #f6f6f2; background: var(--ink); }
+    .data-stage aside p { color: #aaa; font: .69rem/1.4 var(--mono); }
+    .data-stage aside strong { color: var(--signal); font: 500 3.8rem/.8 var(--mono); }
+    .data-key { display: grid; grid-template-columns: 3fr 1fr; margin-top: .7rem; border: 1px solid var(--ink); font-size: .84rem; }
+    .data-key span { padding: .65rem .8rem; }
+    .data-key span:first-child { border-right: 1px solid var(--ink); }
+    .data-key b { font-family: var(--mono); }
+
+    figure { margin: 1.8rem 0 0; }
+    .plot { overflow: hidden; border: 1px solid var(--ink); background: var(--white); }
+    .plot svg { display: block; width: 100%; height: auto; }
+    figcaption { margin-top: .65rem; color: var(--quiet); font-size: .82rem; }
+    .plot-key { display: flex; flex-wrap: wrap; gap: .8rem 1.3rem; margin-top: .7rem; color: var(--quiet); font: .66rem var(--mono); }
+    .plot-key span::before { display: inline-block; width: .7rem; height: .7rem; margin-right: .35rem; vertical-align: -.08rem; background: var(--ink); content: ''; }
+    .plot-key .lime::before { background: var(--signal); border: 1px solid var(--ink); }
+    .plot-key .blue::before { background: var(--blue); }
+    .plot-key .orange::before { background: var(--orange); }
+
+    .workflow { display: grid; grid-template-columns: repeat(6, minmax(7rem, 1fr)); margin-top: 2rem; border: 1px solid var(--ink); background: var(--white); }
+    .flow-step { position: relative; min-height: 14.5rem; padding: 1rem; border-right: 1px solid var(--ink); }
+    .flow-step:last-child { border-right: 0; }
+    .flow-step::after { position: absolute; top: 1.12rem; right: -.55rem; z-index: 2; color: var(--ink); background: var(--signal); content: '→'; font: 1rem var(--mono); }
+    .flow-step:last-child::after { display: none; }
+    .flow-num { display: grid; width: 2.35rem; height: 2.35rem; place-items: center; border: 1px solid var(--ink); font: .65rem var(--mono); }
+    .flow-step.active { color: #f6f6f2; background: var(--ink); }
+    .flow-step.active .flow-num { color: var(--ink); background: var(--signal); border-color: var(--signal); }
+    .flow-step h3 { margin-top: 2rem; }
+    .flow-step p { margin-bottom: 0; color: var(--quiet); font-size: .82rem; line-height: 1.36; }
+    .flow-step.active p { color: #c4c4bd; }
+
+    .rounds { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.8rem; }
+    .round { border: 1px solid var(--ink); background: var(--white); }
+    .round h3 { margin: 0; padding: .8rem 1rem; border-bottom: 1px solid var(--ink); font: .75rem var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+    .round h3 span { float: right; color: var(--orange); }
+    .round svg { display: block; width: 100%; height: auto; }
+    .round p { margin: 0; padding: .8rem 1rem 1rem; color: var(--quiet); font-size: .84rem; }
+    .legend-box { display: inline-block; margin-top: .8rem; padding: .4rem .6rem; border: 1px dashed var(--ink); color: var(--quiet); font: .66rem var(--mono); }
+
+    .formula { display: grid; grid-template-columns: 1.2fr .8fr; gap: 1px; margin-top: 1.6rem; border: 1px solid var(--ink); background: var(--ink); }
+    .formula > div { padding: 1.2rem; background: var(--white); }
+    .formula > div:last-child { color: #f6f6f2; background: var(--ink); }
+    .formula b { display: block; margin-bottom: .55rem; color: var(--orange); font: .65rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .formula .equation { font: clamp(1.15rem, 2.2vw, 1.8rem) var(--mono); }
+    .formula p { margin-bottom: 0; color: var(--quiet); font-size: .88rem; }
+    .formula > div:last-child p { color: #c4c4bd; }
+
+    .diagnostics { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.8rem; }
+    .diagnostic { border: 1px solid var(--ink); background: var(--white); }
+    .diagnostic h3 { margin: 0; padding: .8rem 1rem; border-bottom: 1px solid var(--ink); }
+    .diagnostic h3 small { float: right; color: var(--quiet); font: .62rem var(--mono); }
+    .diagnostic svg { display: block; width: 100%; height: auto; }
+    .diagnostic p { margin: 0; padding: .8rem 1rem 1rem; color: var(--quiet); font-size: .84rem; }
+
+    .compare { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 1.8rem; border-top: 1px solid var(--ink); border-left: 1px solid var(--ink); }
+    .compare article { min-height: 16rem; padding: 1rem; background: var(--white); border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+    .compare article.km { color: #f6f6f2; background: var(--ink); }
+    .compare .tag { color: var(--quiet); font: .6rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .compare .km .tag { color: var(--signal); }
+    .compare h3 { margin-top: 1.7rem; }
+    .compare p { color: var(--quiet); font-size: .82rem; line-height: 1.38; }
+    .compare .km p { color: #c4c4bd; }
+    .mini-shape { display: block; width: 100%; height: 4.3rem; margin-top: .8rem; border-bottom: 1px solid currentColor; }
+    .compare .mini-shape circle, .compare .mini-shape path, .compare .mini-shape ellipse { fill: none; stroke: currentColor; stroke-width: 1.6; }
+    .compare .mini-shape circle { fill: currentColor; stroke: none; }
+
+    .pca-board { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: .6rem; align-items: center; margin-top: 1.8rem; padding: 1rem; color: #f6f6f2; background: var(--ink); }
+    .pca-stage { min-height: 10rem; padding: .7rem; border: 1px solid #5b5b55; }
+    .pca-stage h3 { margin-bottom: .35rem; color: var(--signal); font: .7rem var(--mono); text-transform: uppercase; }
+    .pca-stage p { color: #c4c4bd; font-size: .78rem; }
+    .pca-arrow { color: var(--signal); font: 1.6rem var(--mono); }
+    .pca-stage svg { display: block; width: 100%; height: auto; margin-top: .3rem; }
+
+    .profile { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--ink); background: var(--white); }
+    .profile table { min-width: 42rem; }
+    .profile th:last-child { background: var(--signal); }
+    .profile-note { margin-top: .8rem; color: var(--quiet); font-size: .86rem; }
+
+    .recall-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.6rem; }
+    details { border: 1px solid var(--ink); background: var(--white); }
+    summary { padding: .9rem 1rem; cursor: pointer; font-weight: 600; }
+    details p, details ul { margin: 0; padding: 0 1rem 1rem; color: var(--quiet); font-size: .88rem; }
+    details ul { padding-left: 2.2rem; }
+
+    .source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.4rem; }
+    .source-card { padding: 1rem; border: 1px solid var(--ink); background: var(--white); }
+    .source-card h3 { margin-bottom: .6rem; }
+    .source-card p, .source-card li { color: var(--quiet); font-size: .84rem; }
+    .source-card ul { margin-bottom: 0; padding-left: 1.25rem; }
+    .scope-table { overflow-x: auto; margin-top: 1.3rem; }
+    .scope-table table { min-width: 42rem; border: 1px solid var(--ink); background: var(--white); }
+    .scope-table th, .scope-table td { border-bottom: 1px solid var(--line); }
+
+    footer.page-footer { max-width: 91rem; margin: auto; padding: 2rem clamp(1.25rem, 5vw, 5rem) 4rem; color: var(--quiet); font-size: .75rem; }
+    footer.page-footer a { text-decoration-thickness: .08em; text-underline-offset: .17em; }
+
+    @media (max-width: 1280px) {
+      .workflow { grid-template-columns: repeat(3, 1fr); }
+      .flow-step:nth-child(3) { border-right: 0; }
+      .flow-step:nth-child(n + 4) { border-top: 1px solid var(--ink); }
+      .flow-step:nth-child(3)::after, .flow-step:nth-child(6)::after { display: none; }
+      .compare { grid-template-columns: repeat(2, 1fr); }
+      .compare article:nth-child(2) { border-right: 0; }
+      .compare article:nth-child(n + 3) { border-top: 1px solid var(--ink); }
+    }
+    @media (max-width: 780px) {
+      .shell { display: block; }
+      .rail { position: relative; display: grid; grid-template-columns: 1fr auto; height: auto; padding: .85rem 1rem; }
+      .rail nav, .rail-note { display: none; }
+      .rail-top { padding: 0; border: 0; }
+      .tidy { margin: 0; padding: 0; border: 0; }
+      .tidy span { display: none; }
+      .hero { grid-template-columns: 1fr; padding-block: 3.6rem; }
+      .section { grid-template-columns: 1fr; gap: 1rem; padding-block: 3.6rem; }
+      .section-index { display: flex; gap: .75rem; align-items: baseline; padding: 0; }
+      .section-index span { margin: 0; }
+      .record { grid-template-columns: repeat(2, 1fr); }
+      .record div:nth-child(2) { border-right: 0; }
+      .record div:nth-child(-n + 2) { border-bottom: 1px solid var(--ink); }
+      .contents { grid-template-columns: 1fr; gap: .75rem; }
+      .data-stage, .formula, .pca-board { grid-template-columns: 1fr; }
+      .data-stage aside { min-height: 8rem; }
+      .data-key { grid-template-columns: 1fr; }
+      .data-key span:first-child { border-right: 0; border-bottom: 1px solid var(--ink); }
+      .rounds, .diagnostics, .recall-grid, .source-grid { grid-template-columns: 1fr; }
+      .pca-arrow { justify-self: center; transform: rotate(90deg); }
+      .workflow { grid-template-columns: repeat(2, 1fr); }
+      .flow-step:nth-child(3) { border-right: 1px solid var(--ink); }
+      .flow-step:nth-child(2), .flow-step:nth-child(4), .flow-step:nth-child(6) { border-right: 0; }
+      .flow-step:nth-child(3), .flow-step:nth-child(4) { border-top: 1px solid var(--ink); }
+      .flow-step:nth-child(3)::after, .flow-step:nth-child(4)::after { display: none; }
+    }
+    @media (max-width: 460px) {
+      .topline span:first-child { display: none; }
+      h1 { font-size: 3.6rem; }
+      .record, .workflow, .compare { grid-template-columns: 1fr; }
+      .record div, .record div:nth-child(n) { border-right: 0; border-bottom: 1px solid var(--ink); }
+      .record div:last-child { border-bottom: 0; }
+      .flow-step, .flow-step:nth-child(n) { min-height: 0; border-right: 0; border-top: 0; border-bottom: 1px solid var(--ink); }
+      .flow-step:last-child { border-bottom: 0; }
+      .flow-step::after { display: none; }
+      .flow-step h3 { margin-top: 1.4rem; }
+      .compare article, .compare article:nth-child(n) { min-height: 0; border-right: 0; border-top: 0; border-bottom: 1px solid var(--ink); }
+      .compare article:last-child { border-bottom: 0; }
+      .contents ol { grid-template-columns: 1fr; }
+    }
+  </style>
+  <style>
+    /* Overview-only breakpoint: keep this layout adjustment out of the generated K-Means guide. */
+    @media (min-width: 781px) and (max-width: 1150px) {
+      .hero { grid-template-columns: 1fr; }
+      .hero-figure { max-width: 46rem; }
+    }
+    .overview-cta {
+      display: inline-block;
+      padding: .85rem 1rem;
+      color: var(--ink);
+      background: var(--signal);
+      border: 1px solid var(--ink);
+      font: 700 .78rem/1.3 var(--mono);
+      text-decoration: none;
+    }
+    .overview-cta:hover, .overview-cta:focus { outline: 2px solid var(--ink); outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to the overview</a>
+  <div class="shell">
+    <aside class="rail" aria-label="Overview sections">
+      <a class="rail-top" href="#main" aria-label="Back to the clustering overview">
+        <span class="mark" aria-hidden="true">x→k</span>
+        <span><span class="rail-kicker">Machine learning</span><span class="rail-title">Clustering overview</span></span>
+      </a>
+      <nav aria-label="On this page">
+        <ol>
+          <li><a href="#idea"><span>01</span> The basic idea</a></li>
+          <li><a href="#picture"><span>02</span> Rows become points</a></li>
+          <li><a href="#similarity"><span>03</span> What “similar” means</a></li>
+          <li><a href="#methods"><span>04</span> A first method map</a></li>
+          <li><a href="#meaning"><span>05</span> What a group means</a></li>
+          <li><a href="#next"><span>06</span> Go deeper: DBSCAN</a></li>
+        </ol>
+      </nav>
+      <p class="rail-note">A gentle starting picture for clustering. Begin with the question, then follow the points.</p>
+      <a class="tidy" href="https://github.com/TidyWeb/" target="_blank" rel="noopener"><img src="assets/tidyweb_logo.png" alt="TidyWeb logo"><span>© TidyWeb<br>Learning library</span></a>
+    </aside>
+
+    <main id="main">
+      <div class="topline"><span>Advanced Data Analysis Techniques</span><span>Clustering / overview</span></div>
+
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Machine learning / an idea before an algorithm</p>
+          <h1>Clustering</h1>
+          <p class="hero-subtitle">Finding possible groups without supplied labels.</p>
+          <p class="lede">Imagine a table of people, places, or things. We know something about each row, but nobody has given us the group names. Clustering looks for rows that are alike in the features we chose. It offers a pattern to investigate—not a hidden answer it can prove is true. This overview is the shared starting point for two full method guides. Begin with <a href="dbscan-full-guide.html">DBSCAN</a> to see density-based groups without choosing K, then continue to <a href="k-means-full-guide.html">K-Means</a> to explore centre-based groups and the choice of K.</p>
+        </div>
+        <figure class="hero-figure" aria-labelledby="hero-caption">
+          <svg viewBox="0 0 560 245" role="img" aria-labelledby="hero-title hero-desc">
+            <title id="hero-title">From rows with no group labels to a pattern worth investigating</title>
+            <desc id="hero-desc">Three panels show a small table with no group label, the same records represented as points, and a possible grouping drawn around nearby points. The proposed groups depend on the chosen features.</desc>
+            <defs>
+              <marker id="overview-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3z" fill="#d9ff38"/></marker>
+            </defs>
+            <text x="18" y="24" fill="#a8a8a0" font-family="DM Mono" font-size="12">A QUESTION, NOT AN ANSWER</text>
+            <g transform="translate(15 42)">
+              <rect width="135" height="150" fill="#1d1d1a" stroke="#55554f"/>
+              <text x="12" y="26" fill="#d9ff38" font-family="DM Mono" font-size="10">ROWS</text>
+              <path d="M12 39H123M12 66H123M12 93H123M12 120H123" stroke="#55554f"/>
+              <text x="14" y="57" fill="#f6f6f2" font-family="DM Mono" font-size="10">A   values   —</text>
+              <text x="14" y="84" fill="#f6f6f2" font-family="DM Mono" font-size="10">B   values   —</text>
+              <text x="14" y="111" fill="#f6f6f2" font-family="DM Mono" font-size="10">C   values   —</text>
+              <text x="12" y="143" fill="#a8a8a0" font-family="DM Mono" font-size="9">NO GROUP GIVEN</text>
+            </g>
+            <path d="M164 117 H204" stroke="#d9ff38" stroke-width="2" marker-end="url(#overview-arrow)"/>
+            <g transform="translate(216 42)">
+              <rect width="135" height="150" fill="#1d1d1a" stroke="#55554f"/>
+              <text x="12" y="20" fill="#d9ff38" font-family="DM Mono" font-size="9">FEATURE SPACE</text>
+              <path d="M20 124V35M20 124H121" stroke="#aaa" stroke-width="1"/>
+              <circle cx="42" cy="93" r="5" fill="#f6f6f2"/><circle cx="49" cy="103" r="5" fill="#f6f6f2"/><circle cx="43" cy="111" r="5" fill="#f6f6f2"/>
+              <circle cx="86" cy="56" r="5" fill="#f6f6f2"/><circle cx="99" cy="63" r="5" fill="#f6f6f2"/><circle cx="91" cy="49" r="5" fill="#f6f6f2"/>
+              <circle cx="101" cy="108" r="5" fill="#f6f6f2"/><circle cx="111" cy="101" r="5" fill="#f6f6f2"/><circle cx="105" cy="115" r="5" fill="#f6f6f2"/>
+              <text x="10" y="143" fill="#a8a8a0" font-family="DM Mono" font-size="9">ROWS AS POINTS</text>
+            </g>
+            <path d="M365 117 H405" stroke="#d9ff38" stroke-width="2" marker-end="url(#overview-arrow)"/>
+            <g transform="translate(417 42)">
+              <rect width="128" height="150" fill="#1d1d1a" stroke="#55554f"/>
+              <text x="9" y="20" fill="#d9ff38" font-family="DM Mono" font-size="9">POSSIBLE GROUPS</text>
+              <ellipse cx="47" cy="102" rx="23" ry="20" fill="none" stroke="#d9ff38" stroke-width="2"/>
+              <ellipse cx="94" cy="56" rx="24" ry="19" fill="none" stroke="#4bb2c5" stroke-width="2"/>
+              <ellipse cx="105" cy="108" rx="21" ry="20" fill="none" stroke="#f6a66f" stroke-width="2"/>
+              <circle cx="42" cy="93" r="4" fill="#f6f6f2"/><circle cx="49" cy="103" r="4" fill="#f6f6f2"/><circle cx="43" cy="111" r="4" fill="#f6f6f2"/>
+              <circle cx="86" cy="56" r="4" fill="#f6f6f2"/><circle cx="99" cy="63" r="4" fill="#f6f6f2"/><circle cx="91" cy="49" r="4" fill="#f6f6f2"/>
+              <circle cx="101" cy="108" r="4" fill="#f6f6f2"/><circle cx="111" cy="101" r="4" fill="#f6f6f2"/><circle cx="105" cy="115" r="4" fill="#f6f6f2"/>
+              <text x="9" y="143" fill="#a8a8a0" font-family="DM Mono" font-size="9">A PROPOSAL TO CHECK</text>
+            </g>
+          </svg>
+          <figcaption id="hero-caption">A schematic: records become points, and an algorithm proposes groups. The features and method shape the picture.</figcaption>
+        </figure>
+      </header>
+
+      <div class="content">
+        <section class="record" aria-label="Overview record">
+          <div><strong>Start with</strong>Rows and useful features</div>
+          <div><strong>No supplied</strong>Group answer</div>
+          <div><strong>Look for</strong>Similar records</div>
+          <div><strong>Remember</strong>Pattern ≠ proof</div>
+        </section>
+
+        <div class="note signal"><strong>The whole idea in one sentence.</strong> Clustering groups records that look alike under a chosen representation; it does not discover a guaranteed, universal set of “true types”.</div>
+
+        <nav class="contents" aria-label="Overview contents">
+          <strong>Follow the idea</strong>
+          <ol>
+            <li><a href="#idea">Why look for groups?</a></li>
+            <li><a href="#picture">How a row becomes a point</a></li>
+            <li><a href="#similarity">Why feature choice changes “similar”</a></li>
+            <li><a href="#methods">K-Means and DBSCAN at a glance</a></li>
+            <li><a href="#meaning">How to read a proposed group</a></li>
+            <li><a href="#next">Continue into DBSCAN</a></li>
+          </ol>
+        </nav>
+
+        <section id="idea" class="section">
+          <div class="section-index"><b>01</b><span>The<br>basic<br>idea</span></div>
+          <div class="section-main">
+            <h2>What changes when no answer is supplied?</h2>
+            <p class="intro">In a supervised task, examples come with answers such as “late” or “on time”; the model learns to predict those answers. In clustering, we have descriptions of the records, but no supplied category telling us which records belong together. We ask whether the descriptions reveal useful structure.</p>
+            <div class="formula">
+              <div><b>Supervised learning</b><div class="equation">features + known answer</div><p>Learn a rule that predicts the answer for another case.</p></div>
+              <div><b>Clustering</b><div class="equation">features, no group answer</div><p>Propose which records sit near one another in the chosen representation.</p></div>
+            </div>
+            <div class="bridge"><strong>Keep the distinction clear:</strong> “Unlabelled” means the group answer was not supplied for this task. It does not mean the rows contain no information.</div>
+          </div>
+        </section>
+
+        <section id="picture" class="section">
+          <div class="section-index"><b>02</b><span>Rows<br>become<br>points</span></div>
+          <div class="section-main">
+            <h2>Give each row a place in the picture.</h2>
+            <p class="intro">A row can describe many things. To draw a simple picture, choose two numerical features: one controls left-to-right position, and one controls up-and-down position. Each dot is still one whole row; the plot is only showing two of its measurements.</p>
+            <div class="data-stage">
+              <div class="table-wrap">
+                <table aria-label="Illustrative customer features before clustering">
+                  <thead><tr><th>Customer</th><th>Annual spend (£ hundreds)</th><th>Visits per year</th><th>Group supplied?</th></tr></thead>
+                  <tbody>
+                    <tr><td>A</td><td>1.0</td><td>1.0</td><td>—</td></tr>
+                    <tr><td>B</td><td>1.5</td><td>1.2</td><td>—</td></tr>
+                    <tr><td>C</td><td>2.0</td><td>0.8</td><td>—</td></tr>
+                    <tr><td>D</td><td>6.0</td><td>5.5</td><td>—</td></tr>
+                    <tr><td>E</td><td>6.5</td><td>6.0</td><td>—</td></tr>
+                    <tr><td>F</td><td>5.8</td><td>6.2</td><td>—</td></tr>
+                    <tr><td>G</td><td>10.0</td><td>1.0</td><td>—</td></tr>
+                    <tr><td>H</td><td>10.5</td><td>1.3</td><td>—</td></tr>
+                    <tr><td>I</td><td>9.5</td><td>0.8</td><td>—</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <aside><p>Illustrative teaching data—not LMS or real customer records.</p><strong>9</strong><p>rows, each with two plotted features</p></aside>
+            </div>
+
+            <figure>
+              <div class="plot">
+                <svg viewBox="0 0 680 390" role="img" aria-labelledby="scatter-title scatter-desc">
+                  <title id="scatter-title">Nine example customer rows plotted by annual spend and visits</title>
+                  <desc id="scatter-desc">The points A to I use annual spend in hundreds of pounds on the horizontal axis and yearly visits on the vertical axis. Three nearby patterns are visible, but no group labels have been assigned.</desc>
+                  <rect x="0" y="0" width="680" height="390" fill="#fff"/>
+                  <g stroke="#e2e2dc" stroke-width="1">
+                    <path d="M90 315H650M90 275H650M90 235H650M90 195H650M90 155H650M90 115H650M90 75H650"/>
+                    <path d="M90 75V315M196 75V315M302 75V315M408 75V315M514 75V315M620 75V315"/>
+                  </g>
+                  <path d="M90 55V315H650" fill="none" stroke="#111" stroke-width="2"/>
+                  <g fill="#555" font-family="DM Mono, monospace" font-size="12">
+                    <text x="72" y="319" text-anchor="end">0</text><text x="72" y="279" text-anchor="end">1</text><text x="72" y="239" text-anchor="end">2</text><text x="72" y="199" text-anchor="end">3</text><text x="72" y="159" text-anchor="end">4</text><text x="72" y="119" text-anchor="end">5</text><text x="72" y="79" text-anchor="end">6</text>
+                    <text x="90" y="339" text-anchor="middle">0</text><text x="196" y="339" text-anchor="middle">2</text><text x="302" y="339" text-anchor="middle">4</text><text x="408" y="339" text-anchor="middle">6</text><text x="514" y="339" text-anchor="middle">8</text><text x="620" y="339" text-anchor="middle">10</text>
+                    <text x="355" y="374" text-anchor="middle">Annual spend (£ hundreds)</text>
+                    <text transform="translate(24 195) rotate(-90)" text-anchor="middle">Visits per year</text>
+                  </g>
+                  <g fill="#135d77" stroke="#fff" stroke-width="2">
+                    <circle cx="143" cy="275" r="8"/><circle cx="169" cy="267" r="8"/><circle cx="196" cy="283" r="8"/>
+                    <circle cx="408" cy="95" r="8"/><circle cx="434" cy="75" r="8"/><circle cx="397" cy="67" r="8"/>
+                    <circle cx="620" cy="275" r="8"/><circle cx="646" cy="263" r="8"/><circle cx="593" cy="283" r="8"/>
+                  </g>
+                  <g fill="#111" font-family="DM Mono, monospace" font-size="12" font-weight="bold">
+                    <text x="132" y="263">A</text><text x="165" y="253">B</text><text x="199" y="302">C</text>
+                    <text x="395" y="116">D</text><text x="439" y="64">E</text><text x="382" y="60">F</text>
+                    <text x="609" y="296">G</text><text x="649" y="251">H</text><text x="578" y="302">I</text>
+                  </g>
+                  <text x="105" y="47" fill="#64645e" font-family="DM Mono, monospace" font-size="12">NO GROUP LABELS ADDED</text>
+                </svg>
+              </div>
+              <figcaption>Read the axes first: each point is a row, positioned by two selected features. The nearby patches may invite a grouping, but the algorithm has not told us what those patches mean.</figcaption>
+            </figure>
+            <div class="bridge"><strong>What this picture leaves out:</strong> a real row may have dozens or thousands of features. A two-axis plot is a teaching window, not necessarily the whole space the algorithm uses.</div>
+          </div>
+        </section>
+
+        <section id="similarity" class="section">
+          <div class="section-index"><b>03</b><span>Choose<br>what<br>counts</span></div>
+          <div class="section-main">
+            <h2>“Similar” is a modelling choice.</h2>
+            <p class="intro">A computer cannot compare customers by an unspoken idea of “alike”. We choose which measurements represent each row, and those choices define what closeness means. Change the features, their units, or their relative influence, and a row can look close to different neighbours.</p>
+            <div class="workflow" aria-label="The decisions that shape a clustering result">
+              <article class="flow-step active"><span class="flow-num">01</span><h3>Choose rows</h3><p>Who or what is one record in this question?</p></article>
+              <article class="flow-step"><span class="flow-num">02</span><h3>Choose features</h3><p>Which measurements describe the similarity we care about?</p></article>
+              <article class="flow-step"><span class="flow-num">03</span><h3>Prepare scale</h3><p>Could one numeric unit dominate the distances?</p></article>
+              <article class="flow-step"><span class="flow-num">04</span><h3>Choose a method</h3><p>What kind of group shape or structure might fit?</p></article>
+              <article class="flow-step"><span class="flow-num">05</span><h3>Inspect output</h3><p>Are the proposed groups coherent and useful?</p></article>
+              <article class="flow-step"><span class="flow-num">06</span><h3>Use with care</h3><p>Explain the limits before acting on a group label.</p></article>
+            </div>
+            <div class="note"><strong>Small example:</strong> if spend is measured in pounds (thousands) while visits are simple counts, the larger-numbered feature may dominate a distance calculation. Scaling can rebalance units—but the analyst still decides whether those features deserve equal influence.</div>
+          </div>
+        </section>
+
+        <section id="methods" class="section">
+          <div class="section-index"><b>04</b><span>A first<br>method<br>map</span></div>
+          <div class="section-main">
+            <h2>Different methods look for different kinds of structure.</h2>
+            <p class="intro">“Clustering” is a family name, not one single recipe. Start by matching the shape of the question to a method’s basic behaviour. DBSCAN and K-Means each have a full companion guide. Begin with DBSCAN: it finds dense neighbourhoods without asking for K first. Then compare it with K-Means, which builds groups around a chosen number of centres.</p>
+            <div class="compare" aria-label="A first comparison of clustering methods">
+              <article class="km">
+                <span class="tag">Choose the number of groups</span>
+                <h3>K-Means</h3>
+                <svg class="mini-shape" viewBox="0 0 180 70" role="img" aria-label="Three compact point groups, each with a centre">
+                  <circle cx="25" cy="27" r="3"/><circle cx="34" cy="35" r="3"/><circle cx="22" cy="42" r="3"/><path d="M30 24V44M20 34H40"/>
+                  <circle cx="83" cy="27" r="3"/><circle cx="92" cy="36" r="3"/><circle cx="80" cy="42" r="3"/><path d="M86 24V44M76 34H96"/>
+                  <circle cx="141" cy="27" r="3"/><circle cx="150" cy="36" r="3"/><circle cx="138" cy="42" r="3"/><path d="M144 24V44M134 34H154"/>
+                </svg>
+                <p>You tell it how many groups, K, to make. It works by assigning points to nearby centres and updating those centres. A useful first fit for compact, roughly round groups.</p>
+              </article>
+              <article>
+                <span class="tag">Find connected dense regions</span>
+                <h3>DBSCAN</h3>
+                <svg class="mini-shape" viewBox="0 0 180 70" role="img" aria-label="A curved dense group, a separate dense group, and a lone noise point">
+                  <path d="M14 43C22 17 48 14 61 31C72 45 55 59 37 54C25 51 20 42 14 43M98 27C111 13 133 19 139 34C144 48 128 57 113 51C100 47 95 36 98 27"/>
+                  <circle cx="23" cy="35" r="2"/><circle cx="34" cy="28" r="2"/><circle cx="46" cy="31" r="2"/><circle cx="40" cy="43" r="2"/><circle cx="54" cy="45" r="2"/>
+                  <circle cx="108" cy="31" r="2"/><circle cx="120" cy="27" r="2"/><circle cx="130" cy="38" r="2"/><circle cx="118" cy="44" r="2"/><circle cx="147" cy="58" r="3"/>
+                </svg>
+                <p>It grows groups from dense neighbourhoods and can leave sparse points as noise. It does not ask you to choose K, but its density settings matter.</p>
+              </article>
+              <article>
+                <span class="tag">Build a nested merge picture</span>
+                <h3>Hierarchical</h3>
+                <svg class="mini-shape" viewBox="0 0 180 70" role="img" aria-label="A simple branching tree connecting points into nested groups">
+                  <path d="M18 55V35H48M78 55V35H48V20H90M118 55V35H145V20H90M160 55V35H145"/>
+                  <circle cx="18" cy="57" r="3"/><circle cx="78" cy="57" r="3"/><circle cx="118" cy="57" r="3"/><circle cx="160" cy="57" r="3"/>
+                </svg>
+                <p>It builds a hierarchy of merges or splits. You can inspect groups at different levels, but must choose linkage and how to cut the hierarchy.</p>
+              </article>
+              <article>
+                <span class="tag">Model overlapping distributions</span>
+                <h3>Gaussian mixtures</h3>
+                <svg class="mini-shape" viewBox="0 0 180 70" role="img" aria-label="Two overlapping oval distributions">
+                  <ellipse cx="72" cy="36" rx="40" ry="17"/><ellipse cx="111" cy="36" rx="40" ry="17"/>
+                  <circle cx="68" cy="35" r="3"/><circle cx="98" cy="37" r="3"/><circle cx="118" cy="33" r="3"/>
+                </svg>
+                <p>It models data as a mixture of distributions. Membership can be expressed as probabilities rather than only one hard assignment.</p>
+              </article>
+            </div>
+            <div class="bridge"><strong>Two companion guides:</strong> Start with <a href="dbscan-full-guide.html">the full DBSCAN guide</a> to follow groups growing from dense neighbourhoods, including points left as noise. Then continue to <a href="k-means-full-guide.html">the full K-Means guide</a> to follow its centre-and-assignment loop and see why you must choose K. Both build on this overview and explain different ideas of what a group is.</div>
+          </div>
+        </section>
+
+        <section id="meaning" class="section">
+          <div class="section-index"><b>05</b><span>Read<br>the<br>result</span></div>
+          <div class="section-main">
+            <h2>A cluster number is not an explanation.</h2>
+            <p class="intro">If a method gives a row “cluster 0”, that number is just a computer-made identifier. It does not mean “valuable customer”, “at risk”, or any other human story. We have to go back to the original features, summarise the groups, check whether they are stable, and ask whether the distinction is useful for a real purpose.</p>
+            <div class="pca-board" aria-label="From a model output to an interpretation">
+              <div class="pca-stage"><h3>1 · Proposed group</h3><p>“These rows sit near one another under this setup.”</p><svg viewBox="0 0 140 70" role="img" aria-label="Several points inside a proposed outline"><ellipse cx="67" cy="36" rx="38" ry="24" fill="none" stroke="#d9ff38"/><circle cx="46" cy="37" r="4" fill="#f6f6f2"/><circle cx="63" cy="27" r="4" fill="#f6f6f2"/><circle cx="75" cy="43" r="4" fill="#f6f6f2"/><circle cx="91" cy="32" r="4" fill="#f6f6f2"/></svg></div>
+              <span class="pca-arrow" aria-hidden="true">→</span>
+              <div class="pca-stage"><h3>2 · Profile it</h3><p>Which features are higher or lower than in other groups?</p><svg viewBox="0 0 140 70" role="img" aria-label="A simple comparison of feature summaries"><path d="M20 56V15M20 56H125M39 46H58M68 31H87M97 19H116" stroke="#d9ff38" stroke-width="5"/><path d="M39 56V46M68 56V31M97 56V19" stroke="#f6f6f2" stroke-width="2"/></svg></div>
+              <span class="pca-arrow" aria-hidden="true">→</span>
+              <div class="pca-stage"><h3>3 · Check meaning</h3><p>Does the distinction help answer the question—and remain responsible to use?</p><svg viewBox="0 0 140 70" role="img" aria-label="A checklist of interpretation and use questions"><path d="M28 19l6 6 11-13M28 41l6 6 11-13M28 61l6 6 11-13" fill="none" stroke="#d9ff38" stroke-width="3"/><path d="M55 20H117M55 42H117M55 62H105" stroke="#f6f6f2" stroke-width="2"/></svg></div>
+            </div>
+            <div class="note signal"><strong>Useful mental model:</strong> a cluster is a summary of similarity under choices we made. Treat it as a hypothesis to inspect, not a natural fact or a causal explanation.</div>
+          </div>
+        </section>
+
+        <section id="next" class="section">
+          <div class="section-index"><b>06</b><span>Next:<br>DBSCAN<br>in depth</span></div>
+          <div class="section-main">
+            <h2>Start with DBSCAN.</h2>
+            <p class="intro">The overview gave us the shared vocabulary: rows, features, similarity, and possible group shapes. The first full guide follows a small map of pothole reports to show how dense neighbourhoods connect, how isolated reports can remain noise, and how DBSCAN works without a chosen K.</p>
+            <div class="note"><strong>In the DBSCAN guide:</strong> follow the core, border, and noise roles; see how EPS and min_samples shape dense neighbourhoods; then inspect distance, scaling, limitations, and the Python result. After that, continue to <a href="k-means-full-guide.html">K-Means</a> to explore its centres and the decision about K.</div>
+            <p><a class="overview-cta" href="dbscan-full-guide.html">Open the full DBSCAN guide →</a></p>
+            <div class="source-grid">
+              <article class="source-card">
+                <h3>What this overview builds on</h3>
+                <p>The Code Institute lesson introduces the clustering question and names several method families. This overview builds that shared starting point, followed by two full guides that explore DBSCAN and K-Means in depth.</p>
+              </article>
+              <article class="source-card">
+                <h3>Further reading</h3>
+                <p>These scikit-learn references support the method map and the deeper K-Means guide. Examples are not course output.</p>
+                <ul><li><a href="https://scikit-learn.org/stable/modules/clustering.html">Clustering overview</a></li><li><a href="https://scikit-learn.org/stable/auto_examples/cluster/plot_kmeans_assumptions.html">K-Means assumptions</a></li><li><a href="https://scikit-learn.org/stable/auto_examples/cluster/plot_cluster_comparison.html">Comparing clustering algorithms</a></li><li><a href="https://scikit-learn.org/stable/auto_examples/cluster/plot_dbscan.html">DBSCAN example</a></li></ul>
+              </article>
+            </div>
+            <div class="note signal"><strong>Source boundary.</strong> This is a learner-friendly overview built around the LMS topic, not a verbatim transcript. The customer values and original SVG diagrams are illustrative teaching material, not LMS output or real customer data. The two companion guides carry the detailed method explanations.</div>
+          </div>
+        </section>
+      </div>
+
+      <footer class="page-footer">
+        Built in SciKit Style for the Code Institute learning library. The point plot uses the illustrative A–I values also used in the K-Means guide. Diagrams on this overview are original teaching schematics; the scikit-learn pages linked above are technical references and visual inspiration, not copied figures.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
